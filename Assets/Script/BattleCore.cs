@@ -2,6 +2,9 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
+using System.Net;
+using System.Net.Sockets;
+using System.Text; // TODO: remove after debugging socket messages
 
 namespace Footsies
 {
@@ -83,8 +86,43 @@ namespace Footsies
         private float endStateTime = 3f;
         private float endStateSkippableTime = 1.5f;
 
+        Socket trainingListener;
+        Socket trainingSocket;
+
         void Awake()
         {
+            if (GameManager.Instance.isTrainingEnv)
+            {
+                // Setup Socket server to listen for the agent's actions
+                IPAddress localhostAddress = null;
+                foreach (var address in System.Net.Dns.GetHostAddresses("localhost"))
+                {
+                    // Only accept IPv4 addresses
+                    if (address.AddressFamily == AddressFamily.InterNetwork)
+                    {
+                        localhostAddress = address;
+                        break; // return the first one found
+                    }
+                }
+                if (localhostAddress == null)
+                {
+                    Debug.Log("ERROR: could not find any suitable IPv4 address for 'localhost'! Quitting...");
+                    Application.Quit();
+                }
+                IPEndPoint ipEndPoint = new IPEndPoint(localhostAddress, 11000); // TODO: hardcoded port and address
+                trainingListener = new Socket(ipEndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+                trainingListener.Bind(ipEndPoint);
+                trainingListener.Listen(1); // maximum queue length of 1, there is only 1 agent
+                Debug.Log("Waiting for the agent to connect to address '" + localhostAddress.ToString() + "'...");
+                trainingSocket = trainingListener.Accept();
+                Debug.Log("Agent connection received!");
+                trainingListener.Close();
+                
+                // Since the socket communication is blocking, we don't need to activate debugPause
+                // It can still be activated, and will effectively pause training
+                isDebugPause = false;
+            }
+
             // Setup dictionary from ScriptableObject data
             fighterDataList.ForEach((data) => data.setupDictionary());
 
@@ -117,6 +155,7 @@ namespace Footsies
                     if (timer <= 0f)
                     {
                         ChangeRoundState(RoundStateType.Fight);
+                        Debug.Log("The fight has started!");
                     }
 
                     if (debugPlayLastRoundInput
@@ -151,6 +190,7 @@ namespace Footsies
                     if (timer <= 0f)
                     {
                         ChangeRoundState(RoundStateType.End);
+                        Debug.Log("Someone got knocked out!");
                     }
 
                     break;
@@ -162,6 +202,7 @@ namespace Footsies
                         || (timer <= endStateSkippableTime && IsKOSkipButtonPressed()))
                     {
                         ChangeRoundState(RoundStateType.Stop);
+                        Debug.Log("Fight over!");
                     }
 
                     break;
@@ -201,7 +242,13 @@ namespace Footsies
                     frameCount = -1;
 
                     currentRecordingInputIndex = 0;
-                    
+
+                    // Environment reset, should send initial state first before receiving actions
+                    if (GameManager.Instance.isTrainingEnv)
+                    {
+                        SendCurrentState();
+                    }
+
                     break;
                 case RoundStateType.KO:
 
@@ -242,7 +289,17 @@ namespace Footsies
 
         void UpdateIntroState()
         {
-            var p1Input = GetP1InputData();
+            InputData p1Input = null;
+            // Ignore the battle intro, only start listening for actions when battle actually starts
+            if (GameManager.Instance.isTrainingEnv)
+            {
+                p1Input = new InputData();
+                p1Input.time = Time.fixedTime - roundStartTime;
+            }
+            else
+            {
+                p1Input = GetP1InputData();
+            }
             var p2Input = GetP2InputData();
             RecordInput(p1Input, p2Input);
             fighter1.UpdateInput(p1Input);
@@ -260,7 +317,7 @@ namespace Footsies
 
         void UpdateFightState()
         {
-            var p1Input = GetP1InputData();
+            var p1Input = GameManager.Instance.isTrainingEnv ? GetP1InputDataTraining() : GetP1InputData();
             var p2Input = GetP2InputData();
             RecordInput(p1Input, p2Input);
             fighter1.UpdateInput(p1Input);
@@ -275,6 +332,11 @@ namespace Footsies
             UpdatePushCharacterVsCharacter();
             UpdatePushCharacterVsBackground();
             UpdateHitboxHurtboxCollision();
+
+            if (GameManager.Instance.isTrainingEnv)
+            {
+                SendCurrentState();
+            }
         }
 
         void UpdateKOState()
@@ -317,6 +379,29 @@ namespace Footsies
             return p1Input;
         }
 
+        // Method exclusively used when training an agent, gets the combination of inputs over the TCP socket
+        InputData GetP1InputDataTraining()
+        {
+            var time = Time.fixedTime - roundStartTime;
+
+            byte[] actionMessage = new byte[3];
+            Debug.Log("Waiting for the agent's action...");
+            int bytesReceived = trainingSocket.Receive(actionMessage);
+            Debug.Log("Agent action received! (" + (int)actionMessage[0] + ", " + (int)actionMessage[1] + ", " + (int)actionMessage[2] + ")");
+            if (bytesReceived != 3)
+            {
+                Debug.Log("ERROR: abnormal number of bytes received from agent's action message (sent " + bytesReceived + ", expected 3)");
+            }
+
+            InputData p1Input = new InputData();
+            p1Input.input |= actionMessage[0] != 0 ? (int)InputDefine.Left : 0;
+            p1Input.input |= actionMessage[1] != 0 ? (int)InputDefine.Right : 0;
+            p1Input.input |= actionMessage[2] != 0 ? (int)InputDefine.Attack : 0;
+            p1Input.time = time;
+
+            return p1Input;
+        }
+
         InputData GetP2InputData()
         {
             if (isReplayingLastRoundInput)
@@ -347,6 +432,15 @@ namespace Footsies
                 p2Input.input |= (int)InputDefine.Right;
 
             return p2Input;
+        }
+
+        void SendCurrentState()
+        {
+            // TODO: send game state (with serialization?)
+            byte[] state = Encoding.ASCII.GetBytes(frameCount.ToString());
+            Debug.Log("Sending the game's current state...");
+            trainingSocket.Send(state);
+            Debug.Log("Current state received by the agent!");
         }
 
         private bool IsKOSkipButtonPressed()
@@ -514,7 +608,7 @@ namespace Footsies
 
             if (isDebugPause)
             {
-                // press f2 during debug pause to 
+                // press f2 during debug pause to advance 1 frame
                 if (Input.GetKeyDown(KeyCode.F2))
                 {
                     return false;

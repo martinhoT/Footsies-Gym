@@ -17,6 +17,7 @@ namespace Footsies
 
         public SceneIndex currentScene { get; private set; }
         public bool isVsCPU { get; private set; }
+        public bool isTrainingEnv { get; private set; }
 
         private void Awake()
         {
@@ -27,7 +28,52 @@ namespace Footsies
 
         private void Start()
         {
-            LoadTitleScene();
+            string[] args = System.Environment.GetCommandLineArgs();
+            string passedArguments = "";
+            bool argAskedForHelp = false;
+            bool argMute = false;
+            foreach (var arg in args)
+            {
+                passedArguments += arg + " ";
+
+                switch (arg)
+                {
+                    case "--training":
+                        isTrainingEnv = true;
+                        break;
+
+                    case "--help":
+                        argAskedForHelp = true;
+                        break;
+
+                    case "--mute":
+                        argMute = true;
+                        break;
+                }
+            }
+            Debug.Log("Passed arguments: " + passedArguments + "\n"
+                + "   Run as training environment? " + isTrainingEnv + "\n"
+                + "   Help? " + argAskedForHelp + "\n"
+                + "   Mute? " + argMute
+            );
+
+            if (argMute)
+            {
+                bool isOn = SoundManager.Instance.isBGMOn;
+                if (isOn)
+                {
+                    SoundManager.Instance.toggleBGM();
+                }
+            }
+
+            if (isTrainingEnv)
+            {
+                LoadVsCPUScene();
+            }
+            else
+            {
+                LoadTitleScene();
+            }
         }
 
         private void Update()
