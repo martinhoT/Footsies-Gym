@@ -54,16 +54,12 @@ namespace Footsies
             Debug.Log("Passed arguments: " + passedArguments + "\n"
                 + "   Run as training environment? " + isTrainingEnv + "\n"
                 + "   Help? " + argAskedForHelp + "\n"
-                + "   Mute? " + argMute
+                + "   Mute? " + argMute + "\n"
             );
 
-            if (argMute)
+            if (argMute && SoundManager.Instance.isAllOn)
             {
-                bool isOn = SoundManager.Instance.isBGMOn;
-                if (isOn)
-                {
-                    SoundManager.Instance.toggleBGM();
-                }
+                SoundManager.Instance.toggleAll();
             }
 
             if (isTrainingEnv)

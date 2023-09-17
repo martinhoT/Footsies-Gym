@@ -436,10 +436,23 @@ namespace Footsies
 
         void SendCurrentState()
         {
-            // TODO: send game state (with serialization?)
-            byte[] state = Encoding.ASCII.GetBytes(frameCount.ToString());
+            fighter1 = _fighters[0];
+            fighter2 = _fighters[1];
+            EnvironmentState state = new EnvironmentState(
+               fighter1.vitalHealth, // p1Vital
+               fighter2.vitalHealth, // p2Vital
+               fighter1.guardHealth, // p1Guard
+               fighter2.guardHealth, // p2Guard
+               fighter1.currentActionID, // p1Move
+               fighter1.currentActionFrame, // p1MoveFrame
+               fighter2.currentActionID, // p2Move
+               fighter2.currentActionFrame, // p2MoveFrame
+               fighter1.position.x, // p1Position
+               fighter2.position.x // p2Position
+            );
+            string state_json = JsonUtility.ToJson(state);
             Debug.Log("Sending the game's current state...");
-            trainingSocket.Send(state);
+            trainingSocket.Send(Encoding.UTF8.GetBytes(state_json));
             Debug.Log("Current state received by the agent!");
         }
 

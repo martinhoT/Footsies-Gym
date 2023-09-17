@@ -21,6 +21,8 @@ namespace Footsies
 
         private float defaultBGMVolume;
         public bool isBGMOn { get; private set; }
+        private float defaultSEVolume;
+        public bool isAllOn { get; private set; }
 
         private void Awake()
         {
@@ -29,8 +31,11 @@ namespace Footsies
             seSource1 = seSourceObject1.GetComponent<AudioSource>();
             seSource2 = seSourceObject2.GetComponent<AudioSource>();
             bgmSource = bgmSourceObject.GetComponent<AudioSource>();
+            defaultSEVolume = seSource1.volume;
+            seSource2.volume = defaultSEVolume; // guarantee both SE sources have the same volume
             defaultBGMVolume = bgmSource.volume;
             isBGMOn = true;
+            isAllOn = true;
         }
 
         // Update is called once per frame
@@ -38,9 +43,34 @@ namespace Footsies
         {
 
         }
+        
+        public bool toggleAll()
+        {
+            if (isAllOn)
+            {
+                bgmSource.volume = 0;
+                seSource1.volume = 0;
+                seSource2.volume = 0;
+                isAllOn = false;
+                isBGMOn = false;
+            }
+            else
+            {
+                bgmSource.volume = defaultBGMVolume;
+                seSource1.volume = defaultSEVolume;
+                seSource2.volume = defaultSEVolume;
+                isAllOn = true;
+                isBGMOn = true;
+            }
+
+            return isAllOn;
+        }
 
         public bool toggleBGM()
         {
+            if (!isAllOn)
+                return false;
+
             if (isBGMOn)
             {
                 bgmSource.volume = 0;
