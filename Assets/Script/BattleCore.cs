@@ -448,7 +448,8 @@ namespace Footsies
                fighter2.currentActionID, // p2Move
                fighter2.currentActionFrame, // p2MoveFrame
                fighter1.position.x, // p1Position
-               fighter2.position.x // p2Position
+               fighter2.position.x, // p2Position
+               frameCount // globalFrame
             );
             string state_json = JsonUtility.ToJson(state);
             Debug.Log("Sending the game's current state...");
