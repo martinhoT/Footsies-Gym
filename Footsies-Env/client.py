@@ -4,21 +4,35 @@ import json
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.connect(("localhost", 11000))
 
+
 class EnvironmentState:
-    p1_vital:       int
-    p2_vital:       int
-    p1_guard:       int
-    p2_guard:       int
-    p1_move:        int
-    p1_move_frame:  int
-    p2_move:        int
-    p2_move_frame:  int
-    p1_position:    float
-    p2_position:    float
-    global_frame:   int
+    p1_vital: int
+    p2_vital: int
+    p1_guard: int
+    p2_guard: int
+    p1_move: int
+    p1_move_frame: int
+    p2_move: int
+    p2_move_frame: int
+    p1_position: float
+    p2_position: float
+    global_frame: int
 
     # accept camel-case attributes
-    def __init__(self, p1Vital, p2Vital, p1Guard, p2Guard, p1Move, p1MoveFrame, p2Move, p2MoveFrame, p1Position, p2Position, globalFrame):
+    def __init__(
+        self,
+        p1Vital,
+        p2Vital,
+        p1Guard,
+        p2Guard,
+        p1Move,
+        p1MoveFrame,
+        p2Move,
+        p2MoveFrame,
+        p1Position,
+        p2Position,
+        globalFrame,
+    ):
         self.p1_vital = p1Vital
         self.p2_vital = p2Vital
         self.p1_guard = p1Guard
@@ -30,7 +44,7 @@ class EnvironmentState:
         self.p1_position = p1Position
         self.p2_position = p2Position
         self.global_frame = globalFrame
-    
+
     def observation(self):
         return {k: v for k, v in self.__dict__.items() if k != "global_frame"}
 
@@ -54,6 +68,7 @@ class EnvironmentState:
 [Info]:
 - Frame: {self.global_frame}"""
 
+
 def step(action: tuple[bool]):
     action_message = bytearray(action)
     print("Sending action message...", end=" ")
@@ -64,7 +79,13 @@ def step(action: tuple[bool]):
     next_state = EnvironmentState(**json.loads(next_state_json))
     print(f"received! ({next_state})")
 
-    return next_state.observation(), next_state.p1_vital == 0 or next_state.p2_vital == 0, False, next_state.info()
+    return (
+        next_state.observation(),
+        next_state.p1_vital == 0 or next_state.p2_vital == 0,
+        False,
+        next_state.info(),
+    )
+
 
 def reset():
     print("Environment reset! Receiving initial state...", end=" ")
@@ -82,8 +103,10 @@ try:
         observation, info = reset()
         while not terminated:
             ipt = input("Action: ")
-            next_observation, terminated, truncated, info = step(((key in ipt) for key in ["a", "d", " "]))
-            
+            next_observation, terminated, truncated, info = step(
+                ((key in ipt) for key in ["a", "d", " "])
+            )
+
 
 except KeyboardInterrupt:
     s.close()
