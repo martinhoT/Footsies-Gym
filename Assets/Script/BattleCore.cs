@@ -236,8 +236,9 @@ namespace Footsies
             {
                 case RoundStateType.Stop:
 
-                    if(fighter1RoundWon >= maxRoundWon
-                        || fighter2RoundWon >= maxRoundWon)
+                    if(!GameManager.Instance.isTrainingEnv
+                        && (fighter1RoundWon >= maxRoundWon
+                        || fighter2RoundWon >= maxRoundWon))
                     {
                         GameManager.Instance.LoadTitleScene();
                     }
