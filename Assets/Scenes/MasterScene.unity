@@ -140,7 +140,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7c836d3e89053e343972f5fc3f5075c1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  menuSelectAudioClip: {fileID: 8300000, guid: fce123f7d6e3ffe4fb0d7a28f2d75e1c, type: 3}
+  menuSelectAudioClip: {fileID: 0}
 --- !u!4 &199246508
 Transform:
   m_ObjectHideFlags: 0

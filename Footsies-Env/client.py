@@ -37,6 +37,23 @@ class EnvironmentState:
     def info(self):
         return {"frame": self.global_frame}
 
+    def __str__(self):
+        """Detailed representation of the environment state"""
+        return f"""[P1]:
+- Vital: {self.p1_vital}
+- Guard: {self.p1_guard}
+- Move: {self.p1_move}
+- Move frame: {self.p1_move_frame}
+- Position: {self.p1_position}
+[P2]:
+- Vital: {self.p2_vital}
+- Guard: {self.p2_guard}
+- Move: {self.p2_move}
+- Move frame: {self.p2_move_frame}
+- Position: {self.p2_position}
+[Info]:
+- Frame: {self.global_frame}"""
+
 def step(action: tuple[bool]):
     action_message = bytearray(action)
     print("Sending action message...", end=" ")
@@ -56,6 +73,8 @@ def reset():
     print(f"received! ({state})")
     return state.observation(), state.info()
 
+
+# TODO: unlimited rounds
 
 try:
     while True:
