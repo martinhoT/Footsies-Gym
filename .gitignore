@@ -31,6 +31,10 @@ ExportedObj/
 # Unity3D Generated File On Crash Reports
 sysinfo.txt
 
+# Unity3D miscellaneous folders
+Logs
+UserSettings
+
 # Builds
 *.apk
 *.unitypackage
