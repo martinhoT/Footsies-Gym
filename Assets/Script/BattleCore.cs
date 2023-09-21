@@ -81,6 +81,7 @@ namespace Footsies
         private bool isReplayingLastRoundInput = false;
 
         private InputData p1TrainingInput = null;
+        private bool isTrainingEnv = false;
 
         public bool isDebugPause { get; private set; }
         
@@ -97,8 +98,29 @@ namespace Footsies
 
         void Awake()
         {
-            // TODO: don't use GameManager.Instance to know if it's a training env, it's iffy
-            if (GameManager.Instance.isTrainingEnv)
+            // Setup dictionary from ScriptableObject data
+            fighterDataList.ForEach((data) => data.setupDictionary());
+
+            fighter1 = new Fighter();
+            fighter2 = new Fighter();
+
+            _fighters.Add(fighter1);
+            _fighters.Add(fighter2);
+
+            if(roundUI != null)
+            {
+                roundUIAnimator = roundUI.GetComponent<Animator>();
+            }
+        }
+        
+        void Start()
+        {
+            // This value should not change while we are in the battle scene.
+            // We store this value since we need to know whether a socket was created so we
+            // can close it when the application quits (GameManager may already be destroyed).
+            isTrainingEnv = GameManager.Instance.isTrainingEnv;
+
+            if (isTrainingEnv)
             {
                 // Setup Socket server to listen for the agent's actions
                 IPAddress localhostAddress = null;
@@ -128,25 +150,11 @@ namespace Footsies
                 // We activate debug pause to make the game advance frame-by-frame
                 isDebugPause = true;
             }
-
-            // Setup dictionary from ScriptableObject data
-            fighterDataList.ForEach((data) => data.setupDictionary());
-
-            fighter1 = new Fighter();
-            fighter2 = new Fighter();
-
-            _fighters.Add(fighter1);
-            _fighters.Add(fighter2);
-
-            if(roundUI != null)
-            {
-                roundUIAnimator = roundUI.GetComponent<Animator>();
-            }
         }
-        
+
         void OnDestroy()
         {
-            if (GameManager.Instance.isTrainingEnv)
+            if (isTrainingEnv)
             {
                 p1TrainingSocket.Shutdown(SocketShutdown.Both);
                 p1TrainingSocket.Close();
@@ -197,7 +205,7 @@ namespace Footsies
                         ChangeRoundState(RoundStateType.KO);
                     }
                     // request another action from the training agent, as long as the environment hasn't terminated
-                    else if (GameManager.Instance.isTrainingEnv)
+                    else if (isTrainingEnv)
                     {
                         ReceiveP1TrainingInput();
                         trainingStepPerformed = false; // the current step is over
@@ -237,7 +245,7 @@ namespace Footsies
             {
                 case RoundStateType.Stop:
 
-                    if(!GameManager.Instance.isTrainingEnv
+                    if(!isTrainingEnv
                         && (fighter1RoundWon >= maxRoundWon
                         || fighter2RoundWon >= maxRoundWon))
                     {
@@ -266,7 +274,7 @@ namespace Footsies
                     currentRecordingInputIndex = 0;
 
                     // Environment reset, should send initial state first before receiving actions, and request the first action
-                    if (GameManager.Instance.isTrainingEnv)
+                    if (isTrainingEnv)
                     {
                         SendCurrentState();
                         ReceiveP1TrainingInput();
@@ -314,7 +322,7 @@ namespace Footsies
         {
             InputData p1Input = null;
             // Ignore the battle intro, only start listening for actions when battle actually starts
-            if (GameManager.Instance.isTrainingEnv)
+            if (isTrainingEnv)
             {
                 p1Input = new InputData();
                 p1Input.time = Time.fixedTime - roundStartTime;
@@ -340,7 +348,7 @@ namespace Footsies
 
         void UpdateFightState()
         {
-            var p1Input = GameManager.Instance.isTrainingEnv ? p1TrainingInput : GetP1InputData();
+            var p1Input = isTrainingEnv ? p1TrainingInput : GetP1InputData();
             var p2Input = GetP2InputData();
             RecordInput(p1Input, p2Input);
             fighter1.UpdateInput(p1Input);
@@ -356,7 +364,7 @@ namespace Footsies
             UpdatePushCharacterVsBackground();
             UpdateHitboxHurtboxCollision();
 
-            if (GameManager.Instance.isTrainingEnv)
+            if (isTrainingEnv)
             {
                 SendCurrentState();
                 RequestP1TrainingInput();

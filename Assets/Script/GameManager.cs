@@ -19,19 +19,17 @@ namespace Footsies
         public bool isVsCPU { get; private set; }
         public bool isTrainingEnv { get; private set; }
 
+        private bool shouldMute = false;
+
         private void Awake()
         {
             DontDestroyOnLoad(this.gameObject);
 
             Application.targetFrameRate = 60;
-        }
 
-        private void Start()
-        {
             string[] args = System.Environment.GetCommandLineArgs();
             string passedArguments = "";
             bool argAskedForHelp = false;
-            bool argMute = false;
             foreach (var arg in args)
             {
                 passedArguments += arg + " ";
@@ -47,17 +45,20 @@ namespace Footsies
                         break;
 
                     case "--mute":
-                        argMute = true;
+                        shouldMute = true;
                         break;
                 }
             }
             Debug.Log("Passed arguments: " + passedArguments + "\n"
                 + "   Run as training environment? " + isTrainingEnv + "\n"
                 + "   Help? " + argAskedForHelp + "\n"
-                + "   Mute? " + argMute + "\n"
+                + "   Mute? " + shouldMute + "\n"
             );
+        }
 
-            if (argMute && SoundManager.Instance.isAllOn)
+        private void Start()
+        {
+            if (shouldMute && SoundManager.Instance.isAllOn)
             {
                 SoundManager.Instance.toggleAll();
             }
