@@ -94,8 +94,10 @@ def reset():
     print(f"received! ({state})")
     return state.observation(), state.info()
 
-
-# TODO: unlimited rounds
+# TODO: move training agent input reading (through socket comms) to Update() instead of FixedUpdate()
+# TODO: allow unlimited framerate
+# TODO: mouse interaction in main menu (extremely low priority)
+# TODO: remove intro and outro flair for efficient training
 
 try:
     while True:
