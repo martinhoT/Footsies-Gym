@@ -97,6 +97,7 @@ namespace Footsies
 
         void Awake()
         {
+            // TODO: don't use GameManager.Instance to know if it's a training env, it's iffy
             if (GameManager.Instance.isTrainingEnv)
             {
                 // Setup Socket server to listen for the agent's actions
@@ -389,9 +390,9 @@ namespace Footsies
             var time = Time.fixedTime - roundStartTime;
 
             InputData p1Input = new InputData();
-            p1Input.input |= InputManager.Instance.GetButton(InputManager.Command.p1Left) ? (int)InputDefine.Left : 0;
-            p1Input.input |= InputManager.Instance.GetButton(InputManager.Command.p1Right) ? (int)InputDefine.Right : 0;
-            p1Input.input |= InputManager.Instance.GetButton(InputManager.Command.p1Attack) ? (int)InputDefine.Attack : 0;
+            p1Input.input |= InputManager.Instance.gameplay.p1Left.IsPressed() ? (int)InputDefine.Left : 0;
+            p1Input.input |= InputManager.Instance.gameplay.p1Right.IsPressed() ? (int)InputDefine.Right : 0;
+            p1Input.input |= InputManager.Instance.gameplay.p1Attack.IsPressed() ? (int)InputDefine.Attack : 0;
             p1Input.time = time;
 
             if (debugP1Attack)
@@ -454,9 +455,9 @@ namespace Footsies
             }
             else
             {
-                p2Input.input |= InputManager.Instance.GetButton(InputManager.Command.p2Left) ? (int)InputDefine.Left : 0;
-                p2Input.input |= InputManager.Instance.GetButton(InputManager.Command.p2Right) ? (int)InputDefine.Right : 0;
-                p2Input.input |= InputManager.Instance.GetButton(InputManager.Command.p2Attack) ? (int)InputDefine.Attack : 0;
+                p2Input.input |= InputManager.Instance.gameplay.p2Left.IsPressed() ? (int)InputDefine.Left : 0;
+                p2Input.input |= InputManager.Instance.gameplay.p2Right.IsPressed() ? (int)InputDefine.Right : 0;
+                p2Input.input |= InputManager.Instance.gameplay.p2Attack.IsPressed() ? (int)InputDefine.Attack : 0;
             }
 
             p2Input.time = time;
@@ -494,10 +495,12 @@ namespace Footsies
 
         private bool IsKOSkipButtonPressed()
         {
-            if (InputManager.Instance.GetButton(InputManager.Command.p1Attack))
+            // if (InputManager.Instance.GetButton(InputManager.Command.p1Attack))
+            if (InputManager.Instance.gameplay.p1Attack.WasPressedThisFrame())
                 return true;
 
-            if (InputManager.Instance.GetButton(InputManager.Command.p2Attack))
+            // if (InputManager.Instance.GetButton(InputManager.Command.p2Attack))
+            if (InputManager.Instance.gameplay.p2Attack.WasPressedThisFrame())
                 return true;
 
             return false;
@@ -650,7 +653,7 @@ namespace Footsies
 
         bool CheckUpdateDebugPause()
         {
-            if (Input.GetKeyDown(KeyCode.F1))
+            if (InputManager.Instance.gameplay.debugPause.WasPressedThisFrame())
             {
                 isDebugPause = !isDebugPause;
             }
@@ -658,7 +661,7 @@ namespace Footsies
             if (isDebugPause)
             {
                 // press f2 during debug pause to advance 1 frame
-                if (Input.GetKeyDown(KeyCode.F2) || trainingStepPerformed)
+                if (InputManager.Instance.gameplay.debugPauseAdvance.WasPressedThisFrame() || trainingStepPerformed)
                 {
                     return false;
                 }

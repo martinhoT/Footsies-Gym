@@ -76,7 +76,7 @@ namespace Footsies
         {
             if(currentScene == SceneIndex.Battle)
             {
-                if(Input.GetButtonDown("Cancel"))
+                if(InputManager.Instance.gameplay.cancel.WasPressedThisFrame())
                 {
                     LoadTitleScene();
                 }

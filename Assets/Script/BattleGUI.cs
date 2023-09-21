@@ -87,7 +87,7 @@ namespace Footsies
 
         private void FixedUpdate()
         {
-            if (Input.GetKeyDown(KeyCode.F12))
+            if (InputManager.Instance.gameplay.debugDraw.WasPressedThisFrame())
             {
                 drawDebug = !drawDebug;
             }
