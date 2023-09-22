@@ -38,3 +38,6 @@ UserSettings
 # Builds
 *.apk
 *.unitypackage
+
+# Python
+__pycache__
