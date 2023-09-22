@@ -207,8 +207,8 @@ namespace Footsies
                     // request another action from the training agent, as long as the environment hasn't terminated
                     else if (isTrainingEnv)
                     {
-                        ReceiveP1TrainingInput();
                         trainingStepPerformed = false; // the current step is over
+                        RequestP1TrainingInput();
                     }
 
                     break;
@@ -416,8 +416,8 @@ namespace Footsies
         {
             if (!trainingStepPerformed && !trainingStepRequested)
             {
-                ReceiveP1TrainingInput();
                 trainingStepRequested = true;
+                ReceiveP1TrainingInput();
             }
         }
 
