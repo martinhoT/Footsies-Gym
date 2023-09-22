@@ -98,6 +98,8 @@ def reset():
 # TODO: allow unlimited framerate
 # TODO: mouse interaction in main menu (extremely low priority)
 # TODO: remove intro and outro flair for efficient training
+# TODO: decouple training from the debug pause mode (should NOT be allowed)
+# TODO: close game when socket is closed
 
 try:
     while True:
