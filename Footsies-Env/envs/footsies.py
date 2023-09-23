@@ -84,7 +84,7 @@ class FootsiesEnv(gym.Env):
         """
         if self._game_instance is None:
             # TODO: specify address and port in these arguments
-            args = [self.game_path, "-logFile", "-", "--mute", "--training"]
+            args = [self.game_path, "-logFile", "-", "--mute", "--training" , "--address", self.game_address, "--port", self.game_port]
             if self.render_mode is None:
                 args.extend(["-batchmode", "-nographics"])
             self._game_instance = subprocess.Popen(args, stdout=subprocess.PIPE)

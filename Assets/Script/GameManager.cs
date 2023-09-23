@@ -18,6 +18,8 @@ namespace Footsies
         public SceneIndex currentScene { get; private set; }
         public bool isVsCPU { get; private set; }
         public bool isTrainingEnv { get; private set; }
+        public string trainingAddress { get; private set; }
+        public int trainingPort { get; private set; }
 
         private bool shouldMute = false;
 
@@ -27,9 +29,15 @@ namespace Footsies
 
             Application.targetFrameRate = 60;
 
+            // Default values
+            isTrainingEnv = false;
+            trainingAddress = "localhost";
+            trainingPort = 11000;
+
             string[] args = System.Environment.GetCommandLineArgs();
             string passedArguments = "";
             bool argAskedForHelp = false;
+            int argIndex = 0;
             foreach (var arg in args)
             {
                 passedArguments += arg + " ";
@@ -47,12 +55,24 @@ namespace Footsies
                     case "--mute":
                         shouldMute = true;
                         break;
+                    
+                    case "--address":
+                        trainingAddress = args[argIndex + 1];
+                        break;
+
+                    case "--port":
+                        trainingPort = Convert.ToUInt16(args[argIndex + 1]);
+                        break;
                 }
+
+                argIndex++;
             }
             Debug.Log("Passed arguments: " + passedArguments + "\n"
                 + "   Run as training environment? " + isTrainingEnv + "\n"
                 + "   Help? " + argAskedForHelp + "\n"
                 + "   Mute? " + shouldMute + "\n"
+                + "   Training address: " + trainingAddress + "\n"
+                + "   Training port: " + trainingPort + "\n"
             );
         }
 

@@ -85,7 +85,7 @@ namespace Footsies
 
         public bool isDebugPause { get; private set; }
         
-        private bool trainingStepPerformed = false; // read-only on the main thread
+        private bool trainingStepPerformed = false;
         private bool trainingStepRequested = false;
 
         private float introStateTime = 3f;
@@ -124,7 +124,7 @@ namespace Footsies
             {
                 // Setup Socket server to listen for the agent's actions
                 IPAddress localhostAddress = null;
-                foreach (var address in System.Net.Dns.GetHostAddresses("localhost"))
+                foreach (var address in System.Net.Dns.GetHostAddresses(GameManager.Instance.trainingAddress))
                 {
                     // Only accept IPv4 addresses
                     if (address.AddressFamily == AddressFamily.InterNetwork)
@@ -138,7 +138,7 @@ namespace Footsies
                     Debug.Log("ERROR: could not find any suitable IPv4 address for 'localhost'! Quitting...");
                     Application.Quit();
                 }
-                IPEndPoint ipEndPoint = new IPEndPoint(localhostAddress, 11000); // TODO: hardcoded port and address
+                IPEndPoint ipEndPoint = new IPEndPoint(localhostAddress, GameManager.Instance.trainingPort); // TODO: hardcoded port and address
                 trainingListener = new Socket(ipEndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
                 trainingListener.Bind(ipEndPoint);
                 trainingListener.Listen(1); // maximum queue length of 1, there is only 1 agent
@@ -198,16 +198,20 @@ namespace Footsies
                     frameCount++;
                     
                     UpdateFightState();
+                    if (isTrainingEnv)
+                    {
+                        SendCurrentState();
+                    }
+                    trainingStepPerformed = false; // the current step is over
 
                     var deadFighter = _fighters.Find((f) => f.isDead);
                     if(deadFighter != null)
                     {
                         ChangeRoundState(RoundStateType.KO);
                     }
-                    // request another action from the training agent, as long as the environment hasn't terminated
+                    // Request another action from the training agent, as long as the environment hasn't terminated
                     else if (isTrainingEnv)
                     {
-                        trainingStepPerformed = false; // the current step is over
                         RequestP1TrainingInput();
                     }
 
@@ -277,7 +281,7 @@ namespace Footsies
                     if (isTrainingEnv)
                     {
                         SendCurrentState();
-                        ReceiveP1TrainingInput();
+                        RequestP1TrainingInput();
                     }
 
                     break;
@@ -363,12 +367,6 @@ namespace Footsies
             UpdatePushCharacterVsCharacter();
             UpdatePushCharacterVsBackground();
             UpdateHitboxHurtboxCollision();
-
-            if (isTrainingEnv)
-            {
-                SendCurrentState();
-                RequestP1TrainingInput();
-            }
         }
 
         void UpdateKOState()
