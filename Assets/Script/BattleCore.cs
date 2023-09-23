@@ -149,6 +149,11 @@ namespace Footsies
 
                 // We activate debug pause to make the game advance frame-by-frame
                 isDebugPause = true;
+
+                // Skip the intro and outro sequences. Note: we still have to transition to these states since they set up the battle and prepare the next one
+                introStateTime = 0f;
+                koStateTime = 0f;
+                endStateTime = 0f;
             }
         }
 

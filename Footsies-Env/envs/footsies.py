@@ -9,7 +9,6 @@ from moves import FootsiesMove
 
 # TODO: move training agent input reading (through socket comms) to Update() instead of FixedUpdate()
 # TODO: allow unlimited framerate
-# TODO: remove intro and outro flair for efficient training
 # TODO: decouple training from the debug pause mode (which should not be allowed)
 # TODO: close game when socket is closed
 
@@ -83,7 +82,6 @@ class FootsiesEnv(gym.Env):
         No-op if already instantiated
         """
         if self._game_instance is None:
-            # TODO: specify address and port in these arguments
             args = [self.game_path, "-logFile", "-", "--mute", "--training" , "--address", self.game_address, "--port", self.game_port]
             if self.render_mode is None:
                 args.extend(["-batchmode", "-nographics"])
