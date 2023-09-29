@@ -74,7 +74,6 @@ class FootsiesEnv(gym.Env):
         self.reward_range = (-1, 1)
 
         self._current_state = None
-        self._outdated_state = True
 
     def _instantiate_game(self):
         """
@@ -82,10 +81,11 @@ class FootsiesEnv(gym.Env):
         No-op if already instantiated
         """
         if self._game_instance is None:
-            args = [self.game_path, "-logFile", "-", "--mute", "--training" , "--address", self.game_address, "--port", self.game_port]
+            args = [self.game_path, "-logFile", "-", "--mute", "--training" , "--address", self.game_address, "--port", str(self.game_port)]
             if self.render_mode is None:
                 args.extend(["-batchmode", "-nographics"])
-            self._game_instance = subprocess.Popen(args, stdout=subprocess.PIPE)
+            # TODO: stdout=subprocess.PIPE makes the script get stuck due to filled stdout buffer
+            self._game_instance = subprocess.Popen(args, stdout=None)
 
     def _connect_to_game(self, retry_delay: float = 0.5):
         """
@@ -104,27 +104,22 @@ class FootsiesEnv(gym.Env):
                 )  # avoid constantly pestering the game for a connection
                 continue
 
-    def _receive_state(self) -> FootsiesState:
+    def _receive_and_update_state(self) -> FootsiesState:
         """
         Receive the environment state from the FOOTSIES instance.
         No-op if already received the state in the current step
         """
-        if self._outdated_state:
-            state_json = self.comm.recv(MAX_STATE_MESSAGE_BYTES).decode("utf-8")
-            self._current_state = FootsiesState(**json.loads(state_json))
-            self._outdated_state = False
+        state_json = self.comm.recv(MAX_STATE_MESSAGE_BYTES).decode("utf-8")
+        self._current_state = FootsiesState(**json.loads(state_json))
 
         return self._current_state
-
-    def _send_action(self):
-        """Send an action to FOOTSIES instance"""
 
     def _get_obs(self) -> dict:
         """
         Get the current observation from the FOOTSIES instance.
         The observation is a filtered version of the full state, for use by the training agent
         """
-        state = self._receive_state()
+        state = self._current_state
         return {
             "guard": [state.p1_guard, state.p2_guard],
             "move": [state.p1_move, state.p2_move],
@@ -134,12 +129,14 @@ class FootsiesEnv(gym.Env):
 
     def _get_info(self) -> dict:
         """Get the current additional info from the FOOTSIES instance"""
-        state = self._receive_state()
-        return {"frame": state.global_frame}
+        return {"frame": self._current_state.global_frame}
 
     def reset(self) -> "tuple[dict, dict]":
         self._instantiate_game()
         self._connect_to_game()
+        print("Receiving first state...", end=" ", flush=True)
+        self._receive_and_update_state()
+        print(f"first state received (frame: {self._get_info()['frame']})!")
 
         return self._get_obs(), self._get_info()
 
@@ -147,12 +144,15 @@ class FootsiesEnv(gym.Env):
         self, action: "tuple[bool, bool, bool]"
     ) -> "tuple[dict, float, bool, bool, dict]":
         # Send action
-        action_message = bytearray(action)
+        print(f"Sending action {action}...", end=" ", flush=True)
+        action_message = bytearray(tuple(action))
         self.comm.send(action_message)
+        print(f"action sent!")
 
         # Flag the current state as being outdated so that we can receive a new one
-        self._outdated_state = True
-        state = self._receive_state()
+        print("Receiving next state...", end=" ", flush=True)
+        state = self._receive_and_update_state()
+        print(f"next state received (frame: {state.global_frame})!")
 
         # Get next observation, info and reward
         obs = self._get_obs()
@@ -170,9 +170,16 @@ class FootsiesEnv(gym.Env):
     def close(self):
         self.comm.close()  # game should close as well after socket is closed
 
+    def print_game_output(self):
+        """Read and print the FOOTSIES instance's console output. Waits until the game has terminated, if it's still running"""
+        raise NotImplementedError()
+        if self._game_instance is not None:
+            out = self._game_instance.communicate()[0]
+            print(out.decode("utf-8"))
+
 
 if __name__ == "__main__":
-    env = FootsiesEnv(game_path="../../Build/FOOTSIES", render_mode="human")
+    env = FootsiesEnv(game_path="../../Build/FOOTSIES.exe", render_mode="human")
 
     try:
         while True:

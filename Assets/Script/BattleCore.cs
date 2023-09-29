@@ -85,8 +85,8 @@ namespace Footsies
 
         public bool isDebugPause { get; private set; }
         
-        private bool trainingStepPerformed = false;
         private bool trainingStepRequested = false;
+        private bool trainingStepPerformed = false;
 
         private float introStateTime = 3f;
         private float koStateTime = 2f;
@@ -206,8 +206,8 @@ namespace Footsies
                     if (isTrainingEnv)
                     {
                         SendCurrentState();
+                        trainingStepPerformed = false;
                     }
-                    trainingStepPerformed = false; // the current step is over
 
                     var deadFighter = _fighters.Find((f) => f.isDead);
                     if(deadFighter != null)
@@ -422,6 +422,9 @@ namespace Footsies
                 trainingStepRequested = true;
                 ReceiveP1TrainingInput();
             }
+            else {
+                Debug.Log("ERROR: P1 training input request could not be performed!");
+            }
         }
 
         private async void ReceiveP1TrainingInput()
@@ -501,7 +504,7 @@ namespace Footsies
             string state_json = JsonUtility.ToJson(state);
             Debug.Log("Sending the game's current state...");
             p1TrainingSocket.Send(Encoding.UTF8.GetBytes(state_json));
-            Debug.Log("Current state received by the agent!");
+            Debug.Log("Current state received by the agent! (frame: " + frameCount + ")");
         }
 
         private bool IsKOSkipButtonPressed()
