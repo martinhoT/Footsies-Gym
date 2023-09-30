@@ -437,7 +437,13 @@ namespace Footsies
             Debug.Log("Waiting for the agent's action...");
             int bytesReceived = await p1TrainingSocket.ReceiveAsync(actionMessage, SocketFlags.None);
             Debug.Log("Agent action received! (" + (int)actionMessageContent[0] + ", " + (int)actionMessageContent[1] + ", " + (int)actionMessageContent[2] + ")");
-            if (bytesReceived != 3)
+            // EOF has been reached, communication has likely been stopped on the agent's side
+            if (bytesReceived == 0)
+            {
+                Debug.Log("Training agent has ceased communication, quitting...");
+                Application.Quit();
+            }
+            else if (bytesReceived != 3)
             {
                 Debug.Log("ERROR: abnormal number of bytes received from agent's action message (sent " + bytesReceived + ", expected 3)");
             }

@@ -6,10 +6,12 @@ from time import sleep, monotonic
 from gymnasium import spaces
 from state import FootsiesState
 from moves import FootsiesMove
+from exceptions import FootsiesGameClosedError
 
 # TODO: move training agent input reading (through socket comms) to Update() instead of FixedUpdate()
 # TODO: decouple training from the debug pause mode (which should not be allowed)
 # TODO: close game when socket is closed
+# TODO: dynamically change the game's timeScale value depending on the estimated framerate (and improve framerate counter to be the most recent average)
 
 MAX_STATE_MESSAGE_BYTES = 4096
 
@@ -104,14 +106,27 @@ class FootsiesEnv(gym.Env):
                 continue
 
     def _receive_and_update_state(self) -> FootsiesState:
-        """
-        Receive the environment state from the FOOTSIES instance.
-        No-op if already received the state in the current step
-        """
-        state_json = self.comm.recv(MAX_STATE_MESSAGE_BYTES).decode("utf-8")
+        """Receive the environment state from the FOOTSIES instance"""
+        try:
+            state_json = self.comm.recv(MAX_STATE_MESSAGE_BYTES).decode("utf-8")
+        except OSError:
+            raise FootsiesGameClosedError
+
+        # The communication is assumed to work correctly, so if a message wasn't received then the game must have closed
+        if len(state_json) == 0:
+            raise FootsiesGameClosedError
+
         self._current_state = FootsiesState(**json.loads(state_json))
 
         return self._current_state
+
+    def _send_action(self, action: "tuple[bool, bool, bool]"):
+        """Send an action to the FOOTSIES instance"""
+        action_message = bytearray(action)
+        try:
+            self.comm.sendall(action_message)
+        except OSError:
+            raise FootsiesGameClosedError
 
     def _get_obs(self) -> dict:
         """
@@ -144,8 +159,7 @@ class FootsiesEnv(gym.Env):
     ) -> "tuple[dict, float, bool, bool, dict]":
         # Send action
         print(f"Sending action {action}...", end=" ", flush=True)
-        action_message = bytearray(action)
-        self.comm.send(action_message)
+        self._send_action(action)
         print(f"action sent!")
 
         # Flag the current state as being outdated so that we can receive a new one
@@ -171,14 +185,14 @@ class FootsiesEnv(gym.Env):
 
     def print_game_output(self):
         """Read and print the FOOTSIES instance's console output. Waits until the game has terminated, if it's still running"""
-        raise NotImplementedError()
+        raise NotImplementedError
         if self._game_instance is not None:
             out = self._game_instance.communicate()[0]
             print(out.decode("utf-8"))
 
 
 if __name__ == "__main__":
-    env = FootsiesEnv(game_path="../../Build/FOOTSIES.exe", render_mode="human")
+    env = FootsiesEnv(game_path="../../Build/FOOTSIES.exe", render_mode=None)
 
     # Keep track of how many frames/steps were processed each second so that we can adjust how fast the game runs
     frames = 0
@@ -199,4 +213,10 @@ if __name__ == "__main__":
                 print(f"Frames processed per second: {0 if seconds == 0 else frames / seconds:>3.2f} fps")
 
     except KeyboardInterrupt:
+        print("Training manually interrupted by the keyboard")
+
+    except FootsiesGameClosedError:
+        print("Training interrupted due to the game connection being lost (did the game close?)")        
+
+    finally:
         env.close()
