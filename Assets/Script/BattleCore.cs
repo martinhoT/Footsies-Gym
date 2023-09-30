@@ -503,7 +503,7 @@ namespace Footsies
             );
             string state_json = JsonUtility.ToJson(state);
             Debug.Log("Sending the game's current state...");
-            p1TrainingSocket.Send(Encoding.UTF8.GetBytes(state_json));
+            p1TrainingSocket.SendAsync(Encoding.UTF8.GetBytes(state_json), SocketFlags.None);
             Debug.Log("Current state received by the agent! (frame: " + frameCount + ")");
         }
 

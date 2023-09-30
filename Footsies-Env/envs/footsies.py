@@ -2,7 +2,7 @@ import socket
 import json
 import subprocess
 import gymnasium as gym
-from time import sleep
+from time import sleep, monotonic
 from gymnasium import spaces
 from state import FootsiesState
 from moves import FootsiesMove
@@ -145,7 +145,7 @@ class FootsiesEnv(gym.Env):
     ) -> "tuple[dict, float, bool, bool, dict]":
         # Send action
         print(f"Sending action {action}...", end=" ", flush=True)
-        action_message = bytearray(tuple(action))
+        action_message = bytearray(action)
         self.comm.send(action_message)
         print(f"action sent!")
 
@@ -181,14 +181,24 @@ class FootsiesEnv(gym.Env):
 if __name__ == "__main__":
     env = FootsiesEnv(game_path="../../Build/FOOTSIES.exe", render_mode="human")
 
+    # Keep track of how many frames/steps were processed each second so that we can adjust how fast the game runs
+    # TODO: can't do more than 30 fps...
+    frames = 0
+    seconds = 0
+
     try:
-        while True:
+        while True and frames < 900:
             terminated = False
             observation, info = env.reset()
             print("New episode!")
             while not terminated:
+                time_current = monotonic() # for fps tracking
                 action = env.action_space.sample()
                 next_observation, reward, terminated, truncated, info = env.step(action)
+                
+                frames += 1
+                seconds += monotonic() - time_current
+                print(f"Frames processed per second: {0 if seconds == 0 else frames / seconds:>3.2f} fps")
 
     except KeyboardInterrupt:
         env.close()
