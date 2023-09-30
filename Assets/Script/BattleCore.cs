@@ -486,8 +486,6 @@ namespace Footsies
 
         void SendCurrentState()
         {
-            fighter1 = _fighters[0];
-            fighter2 = _fighters[1];
             EnvironmentState state = new EnvironmentState(
                fighter1.vitalHealth, // p1Vital
                fighter2.vitalHealth, // p2Vital

@@ -87,8 +87,9 @@ namespace Footsies
             if (isTrainingEnv)
             {
                 LoadVsCPUScene();
-                // Make the game run 10x faster for more efficient training
+                // Make the game run 10x faster for more efficient training, and increase the target framerate as well for quicker messaging
                 Time.timeScale = 10;
+                Application.targetFrameRate = 1000;
             }
             else
             {

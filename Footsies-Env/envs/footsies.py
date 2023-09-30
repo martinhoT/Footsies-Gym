@@ -8,7 +8,6 @@ from state import FootsiesState
 from moves import FootsiesMove
 
 # TODO: move training agent input reading (through socket comms) to Update() instead of FixedUpdate()
-# TODO: allow unlimited framerate
 # TODO: decouple training from the debug pause mode (which should not be allowed)
 # TODO: close game when socket is closed
 
@@ -182,12 +181,11 @@ if __name__ == "__main__":
     env = FootsiesEnv(game_path="../../Build/FOOTSIES.exe", render_mode="human")
 
     # Keep track of how many frames/steps were processed each second so that we can adjust how fast the game runs
-    # TODO: can't do more than 30 fps...
     frames = 0
     seconds = 0
 
     try:
-        while True and frames < 900:
+        while True:
             terminated = False
             observation, info = env.reset()
             print("New episode!")
