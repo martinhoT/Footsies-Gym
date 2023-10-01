@@ -3,6 +3,7 @@ import json
 import subprocess
 import gymnasium as gym
 from os import path
+from math import log
 from time import sleep, monotonic
 from gymnasium import spaces
 from state import FootsiesState
@@ -11,8 +12,7 @@ from exceptions import FootsiesGameClosedError
 
 # TODO: move training agent input reading (through socket comms) to Update() instead of FixedUpdate()
 # TODO: decouple training from the debug pause mode (which should not be allowed)
-# TODO: close game when socket is closed
-# TODO: dynamically change the game's timeScale value depending on the estimated framerate (and improve framerate counter to be the most recent average)
+# TODO: dynamically change the game's timeScale value depending on the estimated framerate
 
 MAX_STATE_MESSAGE_BYTES = 4096
 
@@ -213,6 +213,9 @@ if __name__ == "__main__":
     # Keep track of how many frames/steps were processed each second so that we can adjust how fast the game runs
     frames = 0
     seconds = 0
+    # Multiply the counters by the decay to avoid infinitely increasing counters and prioritize recent values.
+    # Set to a value such that the 1000th counter value in the past will have a weight of 1%
+    fps_counter_decay = 0.01 ** (1 / 1000)
 
     try:
         while True:
@@ -224,8 +227,8 @@ if __name__ == "__main__":
                 action = env.action_space.sample()
                 next_observation, reward, terminated, truncated, info = env.step(action)
 
-                frames += 1
-                seconds += monotonic() - time_current
+                frames = (frames * fps_counter_decay) + 1
+                seconds = (seconds * fps_counter_decay) + monotonic() - time_current
                 print(
                     f"Frames processed per second: {0 if seconds == 0 else frames / seconds:>3.2f} fps"
                 )
