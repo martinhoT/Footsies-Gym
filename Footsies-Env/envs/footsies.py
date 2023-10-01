@@ -2,6 +2,7 @@ import socket
 import json
 import subprocess
 import gymnasium as gym
+from os import path
 from time import sleep, monotonic
 from gymnasium import spaces
 from state import FootsiesState
@@ -25,6 +26,8 @@ class FootsiesEnv(gym.Env):
         game_path: str = "./Build/FOOTSIES",
         game_address: str = "localhost",
         game_port: int = 11000,
+        log_file: str = None,
+        log_file_overwrite: bool = False,
     ):
         """
         FOOTSIES training environment
@@ -39,10 +42,16 @@ class FootsiesEnv(gym.Env):
             address of the FOOTSIES instance
         game_port: int
             port of the FOOTSIES instance
+        log_file: str
+            path to the log file to which the FOOTSIES instance logs will be written. If `None` logs will be written to the default Unity location
+        log_file_overwrite: bool
+            whether to overwrite the specified log if it already exists
         """
         self.game_path = game_path
         self.game_address = game_address
         self.game_port = game_port
+        self.log_file = log_file
+        self.log_file_overwrite = log_file_overwrite
 
         assert render_mode is None or render_mode in self.metadata["render_modes"]
         self.render_mode = render_mode
@@ -82,11 +91,25 @@ class FootsiesEnv(gym.Env):
         No-op if already instantiated
         """
         if self._game_instance is None:
-            args = [self.game_path, "-logFile", "-", "--mute", "--training" , "--address", self.game_address, "--port", str(self.game_port)]
+            args = [
+                self.game_path,
+                "--mute",
+                "--training",
+                "--address",
+                self.game_address,
+                "--port",
+                str(self.game_port),
+            ]
             if self.render_mode is None:
                 args.extend(["-batchmode", "-nographics"])
-            # TODO: stdout=subprocess.PIPE makes the script get stuck due to filled stdout buffer
-            self._game_instance = subprocess.Popen(args, stdout=None)
+            if self.log_file is not None:
+                if not self.log_file_overwrite and path.exists(self.log_file):
+                    raise FileExistsError(
+                        f"the log file '{self.log_file}' already exists and the environment was set to not overwrite it"
+                    )
+                args.extend(["-logFile", self.log_file])
+
+            self._game_instance = subprocess.Popen(args)
 
     def _connect_to_game(self, retry_delay: float = 0.5):
         """
@@ -183,13 +206,6 @@ class FootsiesEnv(gym.Env):
     def close(self):
         self.comm.close()  # game should close as well after socket is closed
 
-    def print_game_output(self):
-        """Read and print the FOOTSIES instance's console output. Waits until the game has terminated, if it's still running"""
-        raise NotImplementedError
-        if self._game_instance is not None:
-            out = self._game_instance.communicate()[0]
-            print(out.decode("utf-8"))
-
 
 if __name__ == "__main__":
     env = FootsiesEnv(game_path="../../Build/FOOTSIES.exe", render_mode=None)
@@ -204,19 +220,23 @@ if __name__ == "__main__":
             observation, info = env.reset()
             print("New episode!")
             while not terminated:
-                time_current = monotonic() # for fps tracking
+                time_current = monotonic()  # for fps tracking
                 action = env.action_space.sample()
                 next_observation, reward, terminated, truncated, info = env.step(action)
-                
+
                 frames += 1
                 seconds += monotonic() - time_current
-                print(f"Frames processed per second: {0 if seconds == 0 else frames / seconds:>3.2f} fps")
+                print(
+                    f"Frames processed per second: {0 if seconds == 0 else frames / seconds:>3.2f} fps"
+                )
 
     except KeyboardInterrupt:
         print("Training manually interrupted by the keyboard")
 
     except FootsiesGameClosedError:
-        print("Training interrupted due to the game connection being lost (did the game close?)")        
+        print(
+            "Training interrupted due to the game connection being lost (did the game close?)"
+        )
 
     finally:
         env.close()
