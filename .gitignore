@@ -41,3 +41,4 @@ UserSettings
 
 # Python
 __pycache__
+*.egg-info/

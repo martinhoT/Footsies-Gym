@@ -6,9 +6,9 @@ from os import path
 from math import log
 from time import sleep, monotonic
 from gymnasium import spaces
-from state import FootsiesState
-from moves import FootsiesMove
-from exceptions import FootsiesGameClosedError
+from .state import FootsiesState
+from .moves import FootsiesMove
+from .exceptions import FootsiesGameClosedError
 
 # TODO: move training agent input reading (through socket comms) to Update() instead of FixedUpdate()
 # TODO: decouple training from the debug pause mode (which should not be allowed)
