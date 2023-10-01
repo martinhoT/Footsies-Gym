@@ -1,3 +1,7 @@
+**This is a modified version of FOOTSIES that supports training a Reinforcement Learning agent through the Gymnasium API.**
+
+Information regarding this modification, including installation and usage, is present at the [end of the README](#footsies-gym).
+
 # Footsies
 
 FOOTSIES is a 2D fighting game where players can control character movement horizontally 
@@ -30,6 +34,7 @@ XInput controller should work fine in the game.
 
 
 <h3>Mechanics</h3> 
+
 - There is no health bar. The round is lost after being hit by special moves.
 - There is, however, guard bar. You can block opponent attack up to three times. After that, every attack will cause guard break.
 - There are two type of normal moves, neutral attack and forward/backward attack.
@@ -47,3 +52,40 @@ One can be performed by neutral release, and forward/backward release for the ot
 Whether you like the game or not, feel free to leave some comments about your experience on my <b><u><a href="https://twitter.com/">twitter</a></u></b>
 
 If you like the game then invite your friend to play this game too! Seeing some tournament for this game would be a dream come true for me.
+
+## Footsies-Gym
+
+This repository contains the source code for the modified version of FOOTSIES, as well as the Gymnasium environment.
+If binary releases aren't available for your platform, the game has to be built from source (Unity Engine version 2022.3.10f1 was used).
+
+The `footsies_gym` folder is not part of the game's project. This folder contains the Gymnasium environment which allows interaction with the game using Python.
+
+### Installation
+
+The environment was only tested for Python versions +3.8.10.
+The only dependency is the `gymnasium` module ([installation instructions](https://github.com/Farama-Foundation/Gymnasium#installation)). This module doesn't officially support Windows, but it works in this project.
+
+In order to use the environment, install the `footsies_gym` module at the root of the project (using a virtual environment is recommended):
+
+```
+pip install -e footsies_gym
+```
+
+### Usage
+
+The environment can be instantiated in Python with `gymnasium.make` or by directly instantiating `footsies_gym.envs.footsies.FootsiesEnv`:
+
+```python
+env = gymnasium.make("FootsiesEnv-v0")
+# or
+env = FootsiesEnv(...)
+```
+
+Make sure the environment is properly terminated (`env.close()`) so that the socket is gracefully closed.
+
+The game binary itself accepts some command-line arguments, but they don't need to be manually specified for normal usage:
+
+- `--training`: setup the game for training (VS CPU battle with socket I/O)
+- `--mute`: mute all sound
+- `--address`: the address of the socket used for training
+- `--port`: the port of the socket used for training
