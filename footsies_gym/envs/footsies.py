@@ -1,3 +1,4 @@
+from collections import deque
 import socket
 import json
 import subprocess
@@ -22,6 +23,7 @@ class FootsiesEnv(gym.Env):
 
     def __init__(
         self,
+        frame_delay: int = 20,
         render_mode: str = None,
         game_path: str = "./Build/FOOTSIES",
         game_address: str = "localhost",
@@ -34,24 +36,29 @@ class FootsiesEnv(gym.Env):
 
         Parameters
         ----------
+        frame_delay: int
+            with how many frames of delay should environment states be sent to the agent (meant for human reaction time emulation)
         render_mode: str
             how should the environment be rendered
         game_path: str
-            path to the FOOTSIES executable. Preferably to be a fully qualified path
+            path to the FOOTSIES executable. Preferably a fully qualified path
         game_address: str
             address of the FOOTSIES instance
         game_port: int
             port of the FOOTSIES instance
         log_file: str
-            path to the log file to which the FOOTSIES instance logs will be written. If `None` logs will be written to the default Unity location
+            path of the log file to which the FOOTSIES instance logs will be written. If `None` logs will be written to the default Unity location
         log_file_overwrite: bool
-            whether to overwrite the specified log if it already exists
+            whether to overwrite the specified log file if it already exists
         """
         self.game_path = game_path
         self.game_address = game_address
         self.game_port = game_port
         self.log_file = log_file
         self.log_file_overwrite = log_file_overwrite
+
+        # Create a queue containing the last `frame_delay` frames so that we can send delayed frames to the agent
+        self.delayed_frame_queue: deque[FootsiesState] = deque([], maxlen=frame_delay)
 
         assert render_mode is None or render_mode in self.metadata["render_modes"]
         self.render_mode = render_mode
@@ -109,7 +116,7 @@ class FootsiesEnv(gym.Env):
                     )
                 args.extend(["-logFile", self.log_file])
 
-            self._game_instance = subprocess.Popen(args)
+            self._game_instance = subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     def _connect_to_game(self, retry_delay: float = 0.5):
         """
@@ -151,12 +158,8 @@ class FootsiesEnv(gym.Env):
         except OSError:
             raise FootsiesGameClosedError
 
-    def _get_obs(self) -> dict:
-        """
-        Get the current observation from the FOOTSIES instance.
-        The observation is a filtered version of the full state, for use by the training agent
-        """
-        state = self._current_state
+    def _extract_obs(self, state: FootsiesState) -> dict:
+        """Extract the relevant observation data from the environment state"""
         return {
             "guard": [state.p1_guard, state.p2_guard],
             "move": [state.p1_move, state.p2_move],
@@ -164,35 +167,39 @@ class FootsiesEnv(gym.Env):
             "position": [state.p1_position, state.p2_position],
         }
 
-    def _get_info(self) -> dict:
-        """Get the current additional info from the FOOTSIES instance"""
-        return {"frame": self._current_state.global_frame}
+    def _extract_info(self, state: FootsiesState) -> dict:
+        """Get the current additional info from the environment state"""
+        return {"frame": state.global_frame}
 
     def reset(self) -> "tuple[dict, dict]":
+        self.delayed_frame_queue.clear()
+
         self._instantiate_game()
         self._connect_to_game()
-        print("Receiving first state...", end=" ", flush=True)
-        self._receive_and_update_state()
-        print(f"first state received (frame: {self._get_info()['frame']})!")
+        while len(self.delayed_frame_queue) < self.delayed_frame_queue.maxlen:
+            self.delayed_frame_queue.append(self._receive_and_update_state())
+            # Do nothing until we get the first state
+            self._send_action([False, False, False]) # TODO: should we allow the agent to take actions on unknown states anyway?
 
-        return self._get_obs(), self._get_info()
+        state = self.delayed_frame_queue.popleft()
+        self.delayed_frame_queue.append(self._receive_and_update_state())
 
+        return self._extract_obs(state), self._extract_info(state)
+
+    # Step already assumes that the queue of delayed frames is full from reset()
     def step(
         self, action: "tuple[bool, bool, bool]"
     ) -> "tuple[dict, float, bool, bool, dict]":
         # Send action
-        print(f"Sending action {action}...", end=" ", flush=True)
         self._send_action(action)
-        print(f"action sent!")
 
         # Flag the current state as being outdated so that we can receive a new one
-        print("Receiving next state...", end=" ", flush=True)
-        state = self._receive_and_update_state()
-        print(f"next state received (frame: {state.global_frame})!")
+        state = self.delayed_frame_queue.popleft()
+        self.delayed_frame_queue.append(self._receive_and_update_state())
 
         # Get next observation, info and reward
-        obs = self._get_obs()
-        info = self._get_info()
+        obs = self._extract_obs(state)
+        info = self._extract_info(state)
 
         terminated = state.p1_vital == 0 or state.p2_vital == 0
         if terminated:
@@ -208,7 +215,7 @@ class FootsiesEnv(gym.Env):
 
 
 if __name__ == "__main__":
-    env = FootsiesEnv(game_path="../../Build/FOOTSIES.exe", render_mode=None)
+    env = FootsiesEnv(game_path="Build/FOOTSIES.x86_64", render_mode=None)
 
     # Keep track of how many frames/steps were processed each second so that we can adjust how fast the game runs
     frames = 0
@@ -217,11 +224,12 @@ if __name__ == "__main__":
     # Set to a value such that the 1000th counter value in the past will have a weight of 1%
     fps_counter_decay = 0.01 ** (1 / 1000)
 
+    episode_counter = 0
+
     try:
         while True:
             terminated = False
             observation, info = env.reset()
-            print("New episode!")
             while not terminated:
                 time_current = monotonic()  # for fps tracking
                 action = env.action_space.sample()
@@ -230,8 +238,10 @@ if __name__ == "__main__":
                 frames = (frames * fps_counter_decay) + 1
                 seconds = (seconds * fps_counter_decay) + monotonic() - time_current
                 print(
-                    f"Frames processed per second: {0 if seconds == 0 else frames / seconds:>3.2f} fps"
+                    f"Episode {episode_counter:>3} | {0 if seconds == 0 else frames / seconds:>3.2f} fps",
+                    end="\r"
                 )
+            episode_counter += 1
 
     except KeyboardInterrupt:
         print("Training manually interrupted by the keyboard")
