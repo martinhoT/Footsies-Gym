@@ -37,6 +37,7 @@ namespace Footsies
 
             string[] args = System.Environment.GetCommandLineArgs();
             string passedArguments = "";
+            bool argFastForward = false;
             bool argAskedForHelp = false;
             int argIndex = 0;
             foreach (var arg in args)
@@ -47,6 +48,10 @@ namespace Footsies
                 {
                     case "--training":
                         isTrainingEnv = true;
+                        break;
+
+                    case "--fast-forward":
+                        argFastForward = true;
                         break;
 
                     case "--help":
@@ -70,11 +75,19 @@ namespace Footsies
             }
             Debug.Log("Passed arguments: " + passedArguments + "\n"
                 + "   Run as training environment? " + isTrainingEnv + "\n"
+                + "   Fast forward training? " + argFastForward + "\n"
                 + "   Help? " + argAskedForHelp + "\n"
                 + "   Mute? " + shouldMute + "\n"
                 + "   Training address: " + trainingAddress + "\n"
                 + "   Training port: " + trainingPort + "\n"
             );
+
+            if (isTrainingEnv && argFastForward)
+            {
+                // Make the game run 10x faster for more efficient training, and increase the target framerate as well for quicker messaging
+                Time.timeScale = 20;
+                Application.targetFrameRate = 2000;
+            }
         }
 
         private void Start()
@@ -87,9 +100,6 @@ namespace Footsies
             if (isTrainingEnv)
             {
                 LoadVsCPUScene();
-                // Make the game run 10x faster for more efficient training, and increase the target framerate as well for quicker messaging
-                Time.timeScale = 10;
-                Application.targetFrameRate = 1000;
             }
             else
             {
