@@ -18,3 +18,5 @@ class FootsiesMove(Enum):
     GUARD_PROXIMITY = 350
     DEAD = 500
     WIN = 510
+
+discretized_footsies_moves = {move.name: i for i, move in enumerate(FootsiesMove)}

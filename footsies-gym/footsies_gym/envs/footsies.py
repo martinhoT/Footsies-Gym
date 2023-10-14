@@ -8,7 +8,7 @@ from math import log
 from time import sleep, monotonic
 from gymnasium import spaces
 from .state import FootsiesState
-from .moves import FootsiesMove
+from .moves import FootsiesMove, discretized_footsies_moves
 from .exceptions import FootsiesGameClosedError
 
 # TODO: move training agent input reading (through socket comms) to Update() instead of FixedUpdate()
@@ -135,7 +135,9 @@ class FootsiesEnv(gym.Env):
                     )
                 args.extend(["-logFile", self.log_file])
 
-            self._game_instance = subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            self._game_instance = subprocess.Popen(
+                args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+            )
 
     def _connect_to_game(self, retry_delay: float = 0.5):
         """
@@ -179,10 +181,27 @@ class FootsiesEnv(gym.Env):
 
     def _extract_obs(self, state: FootsiesState) -> dict:
         """Extract the relevant observation data from the environment state"""
+        # Simplify the number of frames since the start of the move for moves that last indefinitely
+        p1_move_frame_simple = (
+            0
+            if state.p1_move
+            in {FootsiesMove.STAND, FootsiesMove.FORWARD, FootsiesMove.BACKWARD}
+            else state.p1_move_frame
+        )
+        p2_move_frame_simple = (
+            0
+            if state.p2_move
+            in {FootsiesMove.STAND, FootsiesMove.FORWARD, FootsiesMove.BACKWARD}
+            else state.p2_move_frame
+        )
+
         return {
             "guard": [state.p1_guard, state.p2_guard],
-            "move": [state.p1_move, state.p2_move],
-            "move_frame": [state.p1_move_frame, state.p2_move_frame],
+            "move": [
+                discretized_footsies_moves[state.p1_move],
+                discretized_footsies_moves[state.p2_move],
+            ],
+            "move_frame": [p1_move_frame_simple, p2_move_frame_simple],
             "position": [state.p1_position, state.p2_position],
         }
 
@@ -198,7 +217,9 @@ class FootsiesEnv(gym.Env):
         while len(self.delayed_frame_queue) < self.delayed_frame_queue.maxlen:
             self.delayed_frame_queue.append(self._receive_and_update_state())
             # Do nothing until we get the first state
-            self._send_action([False, False, False]) # TODO: should we allow the agent to take actions on unknown states anyway?
+            self._send_action(
+                [False, False, False]
+            )  # TODO: should we allow the agent to take actions on unknown states anyway?
 
         state = self.delayed_frame_queue.popleft()
         self.delayed_frame_queue.append(self._receive_and_update_state())
@@ -258,7 +279,7 @@ if __name__ == "__main__":
                 seconds = (seconds * fps_counter_decay) + monotonic() - time_current
                 print(
                     f"Episode {episode_counter:>3} | {0 if seconds == 0 else frames / seconds:>3.2f} fps",
-                    end="\r"
+                    end="\r",
                 )
             episode_counter += 1
 
