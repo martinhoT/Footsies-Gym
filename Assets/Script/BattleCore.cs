@@ -1,11 +1,7 @@
-﻿using System.Collections;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.Events;
-using System.Net;
 using System;
 using System.Net.Sockets;
-using System.Text; // TODO: remove after debugging socket messages
 
 namespace Footsies
 {
@@ -80,21 +76,15 @@ namespace Footsies
         private uint lastRoundMaxRecordingInput = 0;
         private bool isReplayingLastRoundInput = false;
 
-        private InputData p1TrainingInput = null;
-        private bool isTrainingEnv = false;
-
         public bool isDebugPause { get; private set; }
-        
-        private bool trainingStepRequested = false;
-        private bool trainingStepPerformed = false;
 
         private float introStateTime = 3f;
         private float koStateTime = 2f;
         private float endStateTime = 3f;
         private float endStateSkippableTime = 1.5f;
 
-        Socket trainingListener;
-        Socket p1TrainingSocket;
+        private TrainingManager trainingManager;
+        private EnvironmentState currentEnvironmentState;
 
         void Awake()
         {
@@ -115,43 +105,14 @@ namespace Footsies
         
         void Start()
         {
-            // This value should not change while we are in the battle scene.
-            // We store this value since we need to know whether a socket was created so we
-            // can close it when the application quits (GameManager may already be destroyed).
-            isTrainingEnv = GameManager.Instance.isTrainingEnv;
+            trainingManager = new TrainingManager(GameManager.Instance.isTrainingEnv, true);
 
-            if (isTrainingEnv)
+            if (trainingManager.isTraining)
             {
-                // Setup Socket server to listen for the agent's actions
-                IPAddress localhostAddress = null;
-                foreach (var address in System.Net.Dns.GetHostAddresses(GameManager.Instance.trainingAddress))
-                {
-                    // Only accept IPv4 addresses
-                    if (address.AddressFamily == AddressFamily.InterNetwork)
-                    {
-                        localhostAddress = address;
-                        break; // return the first one found
-                    }
-                }
-                if (localhostAddress == null)
-                {
-                    Debug.Log("ERROR: could not find any suitable IPv4 address for 'localhost'! Quitting...");
-                    Application.Quit();
-                }
-                IPEndPoint ipEndPoint = new IPEndPoint(localhostAddress, GameManager.Instance.trainingPort); // TODO: hardcoded port and address
-                trainingListener = new Socket(ipEndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
-                trainingListener.Bind(ipEndPoint);
-                trainingListener.Listen(1); // maximum queue length of 1, there is only 1 agent
-                Debug.Log("Waiting for the agent to connect to address '" + localhostAddress.ToString() + "'...");
-                p1TrainingSocket = trainingListener.Accept();
-                Debug.Log("Agent connection received!");
-                trainingListener.Close();
-
-                // We activate debug pause to make the game advance frame-by-frame
-                isDebugPause = true;
+                trainingManager.StartCommunication(GameManager.Instance.trainingAddress, GameManager.Instance.trainingPort);
 
                 // Skip the intro and outro sequences. Note: we still have to transition to these states since they set up the battle and prepare the next one
-                introStateTime = 0f;
+                introStateTime = 0f; // TODO: intro time is important for FOOTSIES since moves can be charged during this time
                 koStateTime = 0f;
                 endStateTime = 0f;
             }
@@ -159,11 +120,8 @@ namespace Footsies
 
         void OnDestroy()
         {
-            if (isTrainingEnv)
-            {
-                p1TrainingSocket.Shutdown(SocketShutdown.Both);
-                p1TrainingSocket.Close();
-            }
+            // OnDestroy() may be called before Start()
+            trainingManager?.CloseCommunication();
         }
 
         void FixedUpdate()
@@ -195,7 +153,7 @@ namespace Footsies
                     break;
                 case RoundStateType.Fight:
 
-                    if(CheckUpdateDebugPause())
+                    if(CheckUpdateDebugPause() || !trainingManager.Ready())
                     {
                         break;
                     }
@@ -203,22 +161,14 @@ namespace Footsies
                     frameCount++;
                     
                     UpdateFightState();
-                    if (isTrainingEnv)
-                    {
-                        SendCurrentState();
-                        trainingStepPerformed = false;
-                    }
 
                     var deadFighter = _fighters.Find((f) => f.isDead);
-                    if(deadFighter != null)
+                    bool battleOver = deadFighter != null;
+                    if(battleOver)
                     {
                         ChangeRoundState(RoundStateType.KO);
                     }
-                    // Request another action from the training agent, as long as the environment hasn't terminated
-                    else if (isTrainingEnv)
-                    {
-                        RequestP1TrainingInput();
-                    }
+                    trainingManager.Step(currentEnvironmentState, battleOver);
 
                     break;
                 case RoundStateType.KO:
@@ -254,7 +204,7 @@ namespace Footsies
             {
                 case RoundStateType.Stop:
 
-                    if(!isTrainingEnv
+                    if(!trainingManager.isTraining
                         && (fighter1RoundWon >= maxRoundWon
                         || fighter2RoundWon >= maxRoundWon))
                     {
@@ -283,11 +233,7 @@ namespace Footsies
                     currentRecordingInputIndex = 0;
 
                     // Environment reset, should send initial state first before receiving actions, and request the first action
-                    if (isTrainingEnv)
-                    {
-                        SendCurrentState();
-                        RequestP1TrainingInput();
-                    }
+                    trainingManager.Step(currentEnvironmentState, false);
 
                     break;
                 case RoundStateType.KO:
@@ -331,10 +277,12 @@ namespace Footsies
         {
             InputData p1Input = null;
             // Ignore the battle intro, only start listening for actions when battle actually starts
-            if (isTrainingEnv)
+            if (trainingManager.isTraining)
             {
-                p1Input = new InputData();
-                p1Input.time = Time.fixedTime - roundStartTime;
+                p1Input = new InputData
+                {
+                    time = Time.fixedTime - roundStartTime
+                };
             }
             else
             {
@@ -353,11 +301,13 @@ namespace Footsies
 
             UpdatePushCharacterVsCharacter();
             UpdatePushCharacterVsBackground();
+
+            UpdateEnvironmentState();
         }
 
         void UpdateFightState()
         {
-            var p1Input = isTrainingEnv ? p1TrainingInput : GetP1InputData();
+            var p1Input = GetP1InputData();
             var p2Input = GetP2InputData();
             RecordInput(p1Input, p2Input);
             fighter1.UpdateInput(p1Input);
@@ -372,6 +322,8 @@ namespace Footsies
             UpdatePushCharacterVsCharacter();
             UpdatePushCharacterVsBackground();
             UpdateHitboxHurtboxCollision();
+
+            UpdateEnvironmentState();
         }
 
         void UpdateKOState()
@@ -389,6 +341,8 @@ namespace Footsies
 
             UpdatePushCharacterVsCharacter();
             UpdatePushCharacterVsBackground();
+
+            UpdateEnvironmentState();
         }
 
         InputData GetP1InputData()
@@ -401,9 +355,16 @@ namespace Footsies
             var time = Time.fixedTime - roundStartTime;
 
             InputData p1Input = new InputData();
-            p1Input.input |= InputManager.Instance.gameplay.p1Left.IsPressed() ? (int)InputDefine.Left : 0;
-            p1Input.input |= InputManager.Instance.gameplay.p1Right.IsPressed() ? (int)InputDefine.Right : 0;
-            p1Input.input |= InputManager.Instance.gameplay.p1Attack.IsPressed() ? (int)InputDefine.Attack : 0;
+            if (trainingManager.isTraining)
+            {
+                p1Input.input = trainingManager.p1TrainingInput;
+            }
+            else
+            {
+                p1Input.input |= InputManager.Instance.gameplay.p1Left.IsPressed() ? (int)InputDefine.Left : 0;
+                p1Input.input |= InputManager.Instance.gameplay.p1Right.IsPressed() ? (int)InputDefine.Right : 0;
+                p1Input.input |= InputManager.Instance.gameplay.p1Attack.IsPressed() ? (int)InputDefine.Attack : 0;
+            }
             p1Input.time = time;
 
             if (debugP1Attack)
@@ -412,50 +373,6 @@ namespace Footsies
                 p1Input.input |= (int)InputDefine.Left;
 
             return p1Input;
-        }
-
-        // no-op if a request is still unfulfilled
-        void RequestP1TrainingInput()
-        {
-            if (!trainingStepPerformed && !trainingStepRequested)
-            {
-                trainingStepRequested = true;
-                ReceiveP1TrainingInput();
-            }
-            else {
-                Debug.Log("ERROR: P1 training input request could not be performed!");
-            }
-        }
-
-        private async void ReceiveP1TrainingInput()
-        {
-            var time = Time.fixedTime - roundStartTime;
-
-            byte[] actionMessageContent = {0, 0, 0};
-            ArraySegment<byte> actionMessage = new ArraySegment<byte>(actionMessageContent);
-
-            Debug.Log("Waiting for the agent's action...");
-            int bytesReceived = await p1TrainingSocket.ReceiveAsync(actionMessage, SocketFlags.None);
-            Debug.Log("Agent action received! (" + (int)actionMessageContent[0] + ", " + (int)actionMessageContent[1] + ", " + (int)actionMessageContent[2] + ")");
-            // EOF has been reached, communication has likely been stopped on the agent's side
-            if (bytesReceived == 0)
-            {
-                Debug.Log("Training agent has ceased communication, quitting...");
-                Application.Quit();
-            }
-            else if (bytesReceived != 3)
-            {
-                Debug.Log("ERROR: abnormal number of bytes received from agent's action message (sent " + bytesReceived + ", expected 3)");
-            }
-            
-            p1TrainingInput = new InputData();
-            p1TrainingInput.input |= actionMessageContent[0] != 0 ? (int)InputDefine.Left : 0;
-            p1TrainingInput.input |= actionMessageContent[1] != 0 ? (int)InputDefine.Right : 0;
-            p1TrainingInput.input |= actionMessageContent[2] != 0 ? (int)InputDefine.Attack : 0;
-            p1TrainingInput.time = time;
-
-            trainingStepRequested = false;
-            trainingStepPerformed = true;
         }
 
         InputData GetP2InputData()
@@ -490,25 +407,39 @@ namespace Footsies
             return p2Input;
         }
 
-        void SendCurrentState()
+        private void UpdateEnvironmentState()
         {
-            EnvironmentState state = new EnvironmentState(
-               fighter1.vitalHealth, // p1Vital
-               fighter2.vitalHealth, // p2Vital
-               fighter1.guardHealth, // p1Guard
-               fighter2.guardHealth, // p2Guard
-               fighter1.currentActionID, // p1Move
-               fighter1.currentActionFrame, // p1MoveFrame
-               fighter2.currentActionID, // p2Move
-               fighter2.currentActionFrame, // p2MoveFrame
-               fighter1.position.x, // p1Position
-               fighter2.position.x, // p2Position
-               frameCount // globalFrame
-            );
-            string state_json = JsonUtility.ToJson(state);
-            Debug.Log("Sending the game's current state...");
-            p1TrainingSocket.SendAsync(Encoding.UTF8.GetBytes(state_json), SocketFlags.None);
-            Debug.Log("Current state received by the agent! (frame: " + frameCount + ")");
+            if (currentEnvironmentState == null)
+            {
+                currentEnvironmentState = new EnvironmentState(
+                    fighter1.vitalHealth, // p1Vital
+                    fighter2.vitalHealth, // p2Vital
+                    fighter1.guardHealth, // p1Guard
+                    fighter2.guardHealth, // p2Guard
+                    fighter1.currentActionID, // p1Move
+                    fighter1.currentActionFrame, // p1MoveFrame
+                    fighter2.currentActionID, // p2Move
+                    fighter2.currentActionFrame, // p2MoveFrame
+                    fighter1.position.x, // p1Position
+                    fighter2.position.x, // p2Position
+                    frameCount // globalFrame
+                );
+            }
+            else
+            {
+                currentEnvironmentState.p1Vital = fighter1.vitalHealth;
+                currentEnvironmentState.p2Vital = fighter2.vitalHealth;
+                currentEnvironmentState.p1Guard = fighter1.guardHealth;
+                currentEnvironmentState.p2Guard = fighter2.guardHealth;
+                currentEnvironmentState.p1Move = fighter1.currentActionID;
+                currentEnvironmentState.p1MoveFrame = fighter1.currentActionFrame;
+                currentEnvironmentState.p2Move = fighter2.currentActionID;
+                currentEnvironmentState.p2MoveFrame = fighter2.currentActionFrame;
+                currentEnvironmentState.p1Position = fighter1.position.x;
+                currentEnvironmentState.p2Position = fighter2.position.x;
+                currentEnvironmentState.globalFrame = frameCount;
+            }
+            
         }
 
         private bool IsKOSkipButtonPressed()
@@ -679,7 +610,7 @@ namespace Footsies
             if (isDebugPause)
             {
                 // press f2 during debug pause to advance 1 frame
-                if (InputManager.Instance.gameplay.debugPauseAdvance.WasPressedThisFrame() || trainingStepPerformed)
+                if (InputManager.Instance.gameplay.debugPauseAdvance.WasPressedThisFrame())
                 {
                     return false;
                 }

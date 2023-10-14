@@ -11,8 +11,10 @@ from .moves import FootsiesMove
 from .exceptions import FootsiesGameClosedError
 
 # TODO: move training agent input reading (through socket comms) to Update() instead of FixedUpdate()
-# TODO: decouple training from the debug pause mode (which should not be allowed)
 # TODO: dynamically change the game's timeScale value depending on the estimated framerate
+# TODO: self-play support
+# TODO: CPU battles against one another (as example)
+# TODO: allow game to run async w.r.t. the agent
 
 MAX_STATE_MESSAGE_BYTES = 4096
 
@@ -208,7 +210,7 @@ class FootsiesEnv(gym.Env):
 
 
 if __name__ == "__main__":
-    env = FootsiesEnv(game_path="../../Build/FOOTSIES.exe", render_mode=None)
+    env = FootsiesEnv(game_path="Build/FOOTSIES.exe", render_mode=None)
 
     # Keep track of how many frames/steps were processed each second so that we can adjust how fast the game runs
     frames = 0
