@@ -18,6 +18,7 @@ namespace Footsies
         public bool isVsCPU { get; private set; }
         public bool isTrainingEnv { get; private set; }
         public bool isTrainingEnvSynced { get; private set; }
+        public bool isTrainingByExample { get; private set; }
         public string trainingAddress { get; private set; }
         public int trainingPort { get; private set; }
 
@@ -32,6 +33,7 @@ namespace Footsies
             // Default values
             isTrainingEnv = false;
             isTrainingEnvSynced = false;
+            isTrainingByExample = false;
             trainingAddress = "localhost";
             trainingPort = 11000;
 
@@ -57,6 +59,10 @@ namespace Footsies
                         isTrainingEnvSynced = true;
                         break;
 
+                    case "--by-example":
+                        isTrainingByExample = true;
+                        break;
+
                     case "--mute":
                         shouldMute = true;
                         break;
@@ -76,6 +82,7 @@ namespace Footsies
                 + "   Run as training environment? " + isTrainingEnv + "\n"
                 + "   Fast forward training? " + argFastForward + "\n"
                 + "   Synced? " + isTrainingEnvSynced + "\n"
+                + "   Training by example? " + isTrainingByExample + "\n"
                 + "   Mute? " + shouldMute + "\n"
                 + "   Training address: " + trainingAddress + "\n"
                 + "   Training port: " + trainingPort + "\n"

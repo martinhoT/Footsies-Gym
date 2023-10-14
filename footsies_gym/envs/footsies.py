@@ -28,7 +28,8 @@ class FootsiesEnv(gym.Env):
         game_address: str = "localhost",
         game_port: int = 11000,
         fast_forward: bool = True,
-        synced: bool = False,
+        synced: bool = True,
+        by_example: bool = False,
         log_file: str = None,
         log_file_overwrite: bool = False,
     ):
@@ -48,7 +49,9 @@ class FootsiesEnv(gym.Env):
         fast_forward: bool
             whether to run the game at a much faster rate than normal
         synced: bool
-            whether to wait for the agent's input before proceeding in the environment. It doesn't make much sense to let both `fast_forward` and `synced` be `True`
+            whether to wait for the agent's input before proceeding in the environment. It doesn't make much sense to let both `fast_forward` to be `True` and `synced` be `False`
+        by_example: bool
+            whether to simply observe another autonomous player play the game. Actions passed in `step()` are ignored
         log_file: str
             path to the log file to which the FOOTSIES instance logs will be written. If `None` logs will be written to the default Unity location
         log_file_overwrite: bool
@@ -59,6 +62,7 @@ class FootsiesEnv(gym.Env):
         self.game_port = game_port
         self.fast_forward = fast_forward
         self.synced = synced
+        self.by_example = by_example
         self.log_file = log_file
         self.log_file_overwrite = log_file_overwrite
 
@@ -116,6 +120,8 @@ class FootsiesEnv(gym.Env):
                 args.append("--fast-forward")
             if self.synced:
                 args.append("--synced")
+            if self.by_example:
+                args.append("--by-example")
             if self.log_file is not None:
                 if not self.log_file_overwrite and path.exists(self.log_file):
                     raise FileExistsError(

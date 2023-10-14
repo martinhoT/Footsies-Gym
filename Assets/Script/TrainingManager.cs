@@ -12,6 +12,8 @@ namespace Footsies
         public bool isTraining { get; private set; } = false;
         // Whether to wait for agent inputs when training or just keep advancing
         public bool isTrainingSynced { get; private set; } = false;
+        // Whether training is being in an observational manner, that is, only states are being received and actions are performed by a different entity
+        public bool isTrainingByExample { get; private set; } = false;
 
         // Whether we already requested for the agent's input
         private bool agentInputRequested = false;
@@ -19,13 +21,21 @@ namespace Footsies
         private bool agentInputReady = true;
         public int p1TrainingInput { get; private set; } = 0;
 
+        private BattleAI p1TrainingExample = null;
+
         Socket trainingListener;
         Socket p1TrainingSocket;
         private bool isCommunicationOn = false;
 
-        public TrainingManager(bool enabled, bool synced) {
+        public TrainingManager(bool enabled, bool synced, BattleAI example) {
             isTraining = enabled;
             isTrainingSynced = synced;
+            isTrainingByExample = example != null;
+
+            if (isTrainingByExample)
+            {
+                p1TrainingExample = example;
+            }
         }
 
         public bool StartCommunication(string address, int port)
@@ -93,6 +103,10 @@ namespace Footsies
                 // Request another action from the training agent, as long as the environment hasn't terminated and the previous input request has been dealt with
                 if (!battleOver)
                 {
+                    if (isTrainingByExample)
+                    {
+                        p1TrainingInput = p1TrainingExample.getNextAIInput();
+                    }
                     agentInputReady = false;
                     RequestP1TrainingInput();
                 }
@@ -139,10 +153,13 @@ namespace Footsies
                 Debug.Log("ERROR: abnormal number of bytes received from agent's action message (sent " + bytesReceived + ", expected 3)");
             }
             
-            p1TrainingInput = 0;
-            p1TrainingInput |= actionMessageContent[0] != 0 ? (int)InputDefine.Left : 0;
-            p1TrainingInput |= actionMessageContent[1] != 0 ? (int)InputDefine.Right : 0;
-            p1TrainingInput |= actionMessageContent[2] != 0 ? (int)InputDefine.Attack : 0;
+            if (!isTrainingByExample)
+            {
+                p1TrainingInput = 0;
+                p1TrainingInput |= actionMessageContent[0] != 0 ? (int)InputDefine.Left : 0;
+                p1TrainingInput |= actionMessageContent[1] != 0 ? (int)InputDefine.Right : 0;
+                p1TrainingInput |= actionMessageContent[2] != 0 ? (int)InputDefine.Attack : 0;
+            }
 
             agentInputRequested = false;
             agentInputReady = true;

@@ -105,7 +105,11 @@ namespace Footsies
         
         void Start()
         {
-            trainingManager = new TrainingManager(GameManager.Instance.isTrainingEnv, GameManager.Instance.isTrainingEnvSynced);
+            trainingManager = new TrainingManager(
+                GameManager.Instance.isTrainingEnv,
+                GameManager.Instance.isTrainingEnvSynced,
+                GameManager.Instance.isTrainingByExample ? new BattleAI(this) : null
+            );
 
             if (trainingManager.isTraining)
             {
