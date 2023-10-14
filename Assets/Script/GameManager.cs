@@ -1,6 +1,4 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.SceneManagement;
 using System;
 
@@ -19,6 +17,7 @@ namespace Footsies
         public SceneIndex currentScene { get; private set; }
         public bool isVsCPU { get; private set; }
         public bool isTrainingEnv { get; private set; }
+        public bool isTrainingEnvSynced { get; private set; }
         public string trainingAddress { get; private set; }
         public int trainingPort { get; private set; }
 
@@ -32,13 +31,13 @@ namespace Footsies
 
             // Default values
             isTrainingEnv = false;
+            isTrainingEnvSynced = false;
             trainingAddress = "localhost";
             trainingPort = 11000;
 
-            string[] args = System.Environment.GetCommandLineArgs();
+            string[] args = Environment.GetCommandLineArgs();
             string passedArguments = "";
             bool argFastForward = false;
-            bool argAskedForHelp = false;
             int argIndex = 0;
             foreach (var arg in args)
             {
@@ -54,8 +53,8 @@ namespace Footsies
                         argFastForward = true;
                         break;
 
-                    case "--help":
-                        argAskedForHelp = true;
+                    case "--synced":
+                        isTrainingEnvSynced = true;
                         break;
 
                     case "--mute":
@@ -76,7 +75,7 @@ namespace Footsies
             Debug.Log("Passed arguments: " + passedArguments + "\n"
                 + "   Run as training environment? " + isTrainingEnv + "\n"
                 + "   Fast forward training? " + argFastForward + "\n"
-                + "   Help? " + argAskedForHelp + "\n"
+                + "   Synced? " + isTrainingEnvSynced + "\n"
                 + "   Mute? " + shouldMute + "\n"
                 + "   Training address: " + trainingAddress + "\n"
                 + "   Training port: " + trainingPort + "\n"
@@ -84,9 +83,9 @@ namespace Footsies
 
             if (isTrainingEnv && argFastForward)
             {
-                // Make the game run 10x faster for more efficient training, and increase the target framerate as well for quicker messaging
+                // Make the game run 20x faster for more efficient training
                 Time.timeScale = 20;
-                Application.targetFrameRate = 2000;
+                Application.targetFrameRate = 1000;
             }
         }
 

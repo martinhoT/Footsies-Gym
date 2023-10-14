@@ -105,7 +105,7 @@ namespace Footsies
         
         void Start()
         {
-            trainingManager = new TrainingManager(GameManager.Instance.isTrainingEnv, true);
+            trainingManager = new TrainingManager(GameManager.Instance.isTrainingEnv, GameManager.Instance.isTrainingEnvSynced);
 
             if (trainingManager.isTraining)
             {

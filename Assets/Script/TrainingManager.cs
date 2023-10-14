@@ -13,8 +13,10 @@ namespace Footsies
         // Whether to wait for agent inputs when training or just keep advancing
         public bool isTrainingSynced { get; private set; } = false;
 
-        private bool trainingStepRequested = false;
-        private bool trainingStepPerformed = false;
+        // Whether we already requested for the agent's input
+        private bool agentInputRequested = false;
+        // Whether the agent is ready to receive the environment state, usually after input from it has been received. It's true on environment reset
+        private bool agentInputReady = true;
         public int p1TrainingInput { get; private set; } = 0;
 
         Socket trainingListener;
@@ -48,7 +50,7 @@ namespace Footsies
                     Debug.Log("ERROR: could not find any suitable IPv4 address for 'localhost'! Quitting...");
                     Application.Quit();
                 }
-                IPEndPoint ipEndPoint = new IPEndPoint(localhostAddress, port); // TODO: hardcoded port and address
+                IPEndPoint ipEndPoint = new IPEndPoint(localhostAddress, port);
                 trainingListener = new Socket(ipEndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
                 trainingListener.Bind(ipEndPoint);
                 trainingListener.Listen(1); // maximum queue length of 1, there is only 1 agent
@@ -83,13 +85,17 @@ namespace Footsies
         {
             if (!isTraining) { return; }
 
-            SendState(state);
-            trainingStepPerformed = false;
-
-            // Request another action from the training agent, as long as the environment hasn't terminated
-            if (!battleOver)
+            // Don't send the environment state until the agent is ready to receive it (relevant when training is async)
+            if (agentInputReady)
             {
-                RequestP1TrainingInput();
+                SendState(state);
+
+                // Request another action from the training agent, as long as the environment hasn't terminated and the previous input request has been dealt with
+                if (!battleOver)
+                {
+                    agentInputReady = false;
+                    RequestP1TrainingInput();
+                }
             }
         }
 
@@ -104,9 +110,9 @@ namespace Footsies
         // no-op if a request is still unfulfilled
         private void RequestP1TrainingInput()
         {
-            if (!trainingStepPerformed && !trainingStepRequested)
+            if (!agentInputReady && !agentInputRequested)
             {
-                trainingStepRequested = true;
+                agentInputRequested = true;
                 ReceiveP1TrainingInput();
             }
             else {
@@ -138,14 +144,14 @@ namespace Footsies
             p1TrainingInput |= actionMessageContent[1] != 0 ? (int)InputDefine.Right : 0;
             p1TrainingInput |= actionMessageContent[2] != 0 ? (int)InputDefine.Attack : 0;
 
-            trainingStepRequested = false;
-            trainingStepPerformed = true;
+            agentInputRequested = false;
+            agentInputReady = true;
         }
 
         public bool Ready() {
             if (!isTraining) { return true; }
 
-            if (isTrainingSynced && !trainingStepPerformed) { return false; }
+            if (isTrainingSynced && !agentInputReady) { return false; }
 
             return true;
         }

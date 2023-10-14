@@ -14,7 +14,6 @@ from .exceptions import FootsiesGameClosedError
 # TODO: dynamically change the game's timeScale value depending on the estimated framerate
 # TODO: self-play support
 # TODO: CPU battles against one another (as example)
-# TODO: allow game to run async w.r.t. the agent
 
 MAX_STATE_MESSAGE_BYTES = 4096
 
@@ -28,6 +27,8 @@ class FootsiesEnv(gym.Env):
         game_path: str = "./Build/FOOTSIES",
         game_address: str = "localhost",
         game_port: int = 11000,
+        fast_forward: bool = True,
+        synced: bool = False,
         log_file: str = None,
         log_file_overwrite: bool = False,
     ):
@@ -44,6 +45,10 @@ class FootsiesEnv(gym.Env):
             address of the FOOTSIES instance
         game_port: int
             port of the FOOTSIES instance
+        fast_forward: bool
+            whether to run the game at a much faster rate than normal
+        synced: bool
+            whether to wait for the agent's input before proceeding in the environment. It doesn't make much sense to let both `fast_forward` and `synced` be `True`
         log_file: str
             path to the log file to which the FOOTSIES instance logs will be written. If `None` logs will be written to the default Unity location
         log_file_overwrite: bool
@@ -52,6 +57,8 @@ class FootsiesEnv(gym.Env):
         self.game_path = game_path
         self.game_address = game_address
         self.game_port = game_port
+        self.fast_forward = fast_forward
+        self.synced = synced
         self.log_file = log_file
         self.log_file_overwrite = log_file_overwrite
 
@@ -59,6 +66,7 @@ class FootsiesEnv(gym.Env):
         self.render_mode = render_mode
 
         self.comm = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.comm.setblocking(True)
         self._game_instance = None
         self._connected = False
 
@@ -104,6 +112,10 @@ class FootsiesEnv(gym.Env):
             ]
             if self.render_mode is None:
                 args.extend(["-batchmode", "-nographics"])
+            if self.fast_forward:
+                args.append("--fast-forward")
+            if self.synced:
+                args.append("--synced")
             if self.log_file is not None:
                 if not self.log_file_overwrite and path.exists(self.log_file):
                     raise FileExistsError(
