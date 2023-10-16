@@ -14,6 +14,8 @@ from .exceptions import FootsiesGameClosedError
 # TODO: move training agent input reading (through socket comms) to Update() instead of FixedUpdate()
 # TODO: dynamically change the game's timeScale value depending on the estimated framerate
 # TODO: self-play support
+# TODO: create wrapper with move durations (frames) normalized between 0 (beginning) and 1 (end)
+# TODO: change data type of move duration to float instead of int to avoid one-hot encoding when flattening (related to above task)
 
 MAX_STATE_MESSAGE_BYTES = 4096
 
