@@ -8,14 +8,12 @@ from math import log
 from time import sleep, monotonic
 from gymnasium import spaces
 from .state import FootsiesState
-from .moves import FootsiesMove, discretized_footsies_moves
+from .moves import FootsiesMove, footsies_move_id_to_index
 from .exceptions import FootsiesGameClosedError
 
 # TODO: move training agent input reading (through socket comms) to Update() instead of FixedUpdate()
 # TODO: dynamically change the game's timeScale value depending on the estimated framerate
 # TODO: self-play support
-# TODO: create wrapper with move durations (frames) normalized between 0 (beginning) and 1 (end)
-# TODO: change data type of move duration to float instead of int to avoid one-hot encoding when flattening (related to above task)
 
 MAX_STATE_MESSAGE_BYTES = 4096
 
@@ -84,6 +82,7 @@ class FootsiesEnv(gym.Env):
 
         # Don't consider the end-of-round moves
         relevant_moves = set(FootsiesMove) - {FootsiesMove.WIN, FootsiesMove.DEAD}
+        maximum_move_duration = max(m.duration for m in relevant_moves)
 
         # The observation space is divided into 2 columns, the first for player 1 and the second for player 2
         self.observation_space = spaces.Dict(
@@ -92,9 +91,7 @@ class FootsiesEnv(gym.Env):
                 "move": spaces.MultiDiscrete(
                     [len(relevant_moves), len(relevant_moves)]
                 ),
-                "move_frame": spaces.MultiDiscrete(
-                    [55, 55]
-                ),  # the maximum number of frames a move can have (excluding WIN and DEAD)
+                "move_frame": spaces.Box(low=0.0, high=maximum_move_duration, shape=(2,)),
                 "position": spaces.Box(low=-4.4, high=4.4, shape=(2,)),
             }
         )
@@ -200,8 +197,8 @@ class FootsiesEnv(gym.Env):
         return {
             "guard": [state.p1_guard, state.p2_guard],
             "move": [
-                discretized_footsies_moves[state.p1_move],
-                discretized_footsies_moves[state.p2_move],
+                footsies_move_id_to_index[state.p1_move],
+                footsies_move_id_to_index[state.p2_move],
             ],
             "move_frame": [p1_move_frame_simple, p2_move_frame_simple],
             "position": [state.p1_position, state.p2_position],
