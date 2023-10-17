@@ -7,8 +7,8 @@ from os import path
 from math import log
 from time import sleep, monotonic
 from gymnasium import spaces
-from .state import FootsiesState
-from .moves import FootsiesMove, footsies_move_id_to_index
+from ..state import FootsiesState
+from ..moves import FootsiesMove, footsies_move_id_to_index
 from .exceptions import FootsiesGameClosedError
 
 # TODO: move training agent input reading (through socket comms) to Update() instead of FixedUpdate()
@@ -82,7 +82,7 @@ class FootsiesEnv(gym.Env):
 
         # Don't consider the end-of-round moves
         relevant_moves = set(FootsiesMove) - {FootsiesMove.WIN, FootsiesMove.DEAD}
-        maximum_move_duration = max(m.duration for m in relevant_moves)
+        maximum_move_duration = max(m.value.duration for m in relevant_moves)
 
         # The observation space is divided into 2 columns, the first for player 1 and the second for player 2
         self.observation_space = spaces.Dict(
