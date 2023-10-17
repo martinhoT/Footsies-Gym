@@ -20,3 +20,11 @@ class FootsiesMoveFrameNormalized(gym.ObservationWrapper):
     def observation(self, obs):
         obs["move_frame"] = obs["move_frame"] / footsies_move_index_to_move[obs["move"]].value.duration
         return obs
+
+class FootsiesActionCombinationsDiscretized(gym.ActionWrapper):
+    def __init__(self, env):
+        super().__init__()
+        self.action_space = spaces.Discrete(2**3) 
+    
+    def action(self, act):
+        return ((act & 4) != 0, (act & 2) != 0, (act & 1) != 0)
