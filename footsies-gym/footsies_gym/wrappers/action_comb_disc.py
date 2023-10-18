@@ -3,7 +3,7 @@ from gymnasium import spaces
 
 class FootsiesActionCombinationsDiscretized(gym.ActionWrapper):
     def __init__(self, env):
-        super().__init__()
+        super().__init__(env)
         self.action_space = spaces.Discrete(2**3) 
     
     def action(self, act):

@@ -70,7 +70,9 @@ class FootsiesEnv(gym.Env):
         self.log_file_overwrite = log_file_overwrite
 
         # Create a queue containing the last `frame_delay` frames so that we can send delayed frames to the agent
-        self.delayed_frame_queue: deque[FootsiesState] = deque([], maxlen=frame_delay)
+        # The actual capacity has one extra space to accomodate for the case that `frame_delay` is 0, so that
+        # the only state to send (the most recent one) can be effectively sent through the queue
+        self.delayed_frame_queue: deque[FootsiesState] = deque([], maxlen=frame_delay + 1)
 
         assert render_mode is None or render_mode in self.metadata["render_modes"]
         self.render_mode = render_mode
@@ -87,7 +89,7 @@ class FootsiesEnv(gym.Env):
         # The observation space is divided into 2 columns, the first for player 1 and the second for player 2
         self.observation_space = spaces.Dict(
             {
-                "guard": spaces.MultiDiscrete([4, 4]),  # 0..3
+                "guard": spaces.Box(low=0.0, high=3.0, shape=(2,)),  # 0..3
                 "move": spaces.MultiDiscrete(
                     [len(relevant_moves), len(relevant_moves)]
                 ),
@@ -208,22 +210,19 @@ class FootsiesEnv(gym.Env):
         """Get the current additional info from the environment state"""
         return {"frame": state.global_frame}
 
-    def reset(self) -> "tuple[dict, dict]":
+    def reset(self, *, seed: int = None, options: dict = None) -> "tuple[dict, dict]":
         self.delayed_frame_queue.clear()
 
         self._instantiate_game()
         self._connect_to_game()
-        while len(self.delayed_frame_queue) < self.delayed_frame_queue.maxlen:
-            self.delayed_frame_queue.append(self._receive_and_update_state())
-            # Do nothing until we get the first state
-            self._send_action(
-                [False, False, False]
-            )  # TODO: should we allow the agent to take actions on unknown states anyway?
+        first_state = self._receive_and_update_state()
+        # We leave a space at the end of the queue since insertion of the most recent state happens before popping the oldest state.
+        # This is done so that the case when `frame_delay` is 0 is correctly handled
+        while len(self.delayed_frame_queue) < self.delayed_frame_queue.maxlen - 1:
+            # Give the agent the same initial state but repeated (`frame_delay` - 1) times
+            self.delayed_frame_queue.append(first_state)
 
-        state = self.delayed_frame_queue.popleft()
-        self.delayed_frame_queue.append(self._receive_and_update_state())
-
-        return self._extract_obs(state), self._extract_info(state)
+        return self._extract_obs(first_state), self._extract_info(first_state)
 
     # Step already assumes that the queue of delayed frames is full from reset()
     def step(
@@ -232,17 +231,21 @@ class FootsiesEnv(gym.Env):
         # Send action
         self._send_action(action)
 
-        # Flag the current state as being outdated so that we can receive a new one
+        # Store the most recent state first and then take the oldest one
+        most_recent_state = self._receive_and_update_state()
+        self.delayed_frame_queue.append(most_recent_state)
         state = self.delayed_frame_queue.popleft()
-        self.delayed_frame_queue.append(self._receive_and_update_state())
+
+        state.p1_move = state.p1_move if state.p1_move not in {FootsiesMove.DEAD.value.id, FootsiesMove.WIN.value.id} else FootsiesMove.STAND.value.id
+        state.p2_move = state.p2_move if state.p2_move not in {FootsiesMove.DEAD.value.id, FootsiesMove.WIN.value.id} else FootsiesMove.STAND.value.id
 
         # Get next observation, info and reward
         obs = self._extract_obs(state)
         info = self._extract_info(state)
 
-        terminated = state.p1_vital == 0 or state.p2_vital == 0
+        terminated = most_recent_state.p1_vital == 0 or most_recent_state.p2_vital == 0
         if terminated:
-            reward = 1 if state.p2_vital == 0 else -1
+            reward = 1 if most_recent_state.p2_vital == 0 else -1
         else:
             reward = 0
 

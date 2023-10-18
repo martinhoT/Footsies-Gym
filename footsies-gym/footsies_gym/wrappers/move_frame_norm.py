@@ -18,5 +18,6 @@ class FootsiesMoveFrameNormalized(gym.ObservationWrapper):
         )
 
     def observation(self, obs):
-        obs["move_frame"] = obs["move_frame"] / footsies_move_index_to_move[obs["move"]].value.duration
+        obs["move_frame"][0] = obs["move_frame"][0] / footsies_move_index_to_move[obs["move"][0]].value.duration
+        obs["move_frame"][1] = obs["move_frame"][1] / footsies_move_index_to_move[obs["move"][1]].value.duration
         return obs
