@@ -1,7 +1,5 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
-using System;
-using System.Net.Sockets;
 
 namespace Footsies
 {
@@ -105,15 +103,17 @@ namespace Footsies
         
         void Start()
         {
-            trainingManager = new TrainingManager(
-                GameManager.Instance.isTrainingEnv,
-                GameManager.Instance.isTrainingEnvSynced,
-                GameManager.Instance.isTrainingByExample ? new BattleAI(this) : null
-            );
+            trainingManager = GameManager.Instance.trainingManager;
 
             if (trainingManager.isTraining)
             {
-                trainingManager.StartCommunication(GameManager.Instance.trainingAddress, GameManager.Instance.trainingPort);
+                // Awkward case, BattleCore is the only one who can setup the TrainingBattleAIActors
+                if (!trainingManager.IsP1ActorSet())
+                    trainingManager.SetP1Actor(new TrainingBattleAIActor(new BattleAI(this)));
+                if (!trainingManager.IsP2ActorSet())
+                    trainingManager.SetP2Actor(new TrainingBattleAIActor(new BattleAI(this)));
+
+                trainingManager.Setup();
 
                 // Skip the intro and outro sequences. Note: we still have to transition to these states since they set up the battle and prepare the next one
                 introStateTime = 0f; // TODO: intro time is important for FOOTSIES since moves can be charged during this time
@@ -125,7 +125,7 @@ namespace Footsies
         void OnDestroy()
         {
             // OnDestroy() may be called before Start()
-            trainingManager?.CloseCommunication();
+            trainingManager?.Close();
         }
 
         void FixedUpdate()
@@ -361,7 +361,7 @@ namespace Footsies
             InputData p1Input = new InputData();
             if (trainingManager.isTraining)
             {
-                p1Input.input = trainingManager.p1TrainingInput;
+                p1Input.input = trainingManager.p1Input();
             }
             else
             {
@@ -390,7 +390,11 @@ namespace Footsies
 
             InputData p2Input = new InputData();
 
-            if (battleAI != null)
+            if (trainingManager.isTraining)
+            {
+                p2Input.input = trainingManager.p2Input();
+            }
+            else if (battleAI != null)
             {
                 p2Input.input |= battleAI.getNextAIInput();
             }
