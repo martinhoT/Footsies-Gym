@@ -11,6 +11,7 @@ namespace Footsies
         public string address { get; private set; }
         public int port { get; private set; }
         public bool synced { get; private set; }
+        public bool noState { get; private set; }
 
         // Whether we already requested for the agent's input
         public bool inputRequested { get; private set; } = false;
@@ -22,11 +23,12 @@ namespace Footsies
         private Socket trainingListener;
         private Socket trainingSocket;
 
-        public TrainingRemoteActor(string address, int port, bool synced)
+        public TrainingRemoteActor(string address, int port, bool synced, bool noState)
         {
             this.address = address;
             this.port = port;
             this.synced = synced;
+            this.noState = noState;
         }
 
         public void Setup()
@@ -63,15 +65,21 @@ namespace Footsies
             trainingSocket.Close();
         }
 
-        public void UpdateCurrentState(EnvironmentState state)
+        public void UpdateCurrentState(EnvironmentState state, bool battleOver)
         {
-            string stateJson = JsonUtility.ToJson(state);
-            Debug.Log("Sending the game's current state...");
-            trainingSocket.SendAsync(Encoding.UTF8.GetBytes(stateJson), SocketFlags.None);
-            Debug.Log("Current state received by the agent! (frame: " + state.globalFrame + ")");
+            if (!noState)
+            {
+                string stateJson = JsonUtility.ToJson(state);
+                Debug.Log("Sending the game's current state...");
+                trainingSocket.SendAsync(Encoding.UTF8.GetBytes(stateJson), SocketFlags.None);
+                Debug.Log("Current state received by the agent! (frame: " + state.globalFrame + ")");
+            }
 
-            // If we received the current environment state, then we will be set to act again
-            inputReady = false;
+            // If we haven't received the terminal environment state, then we will be set to act again, otherwise we just wait to receive the next non-terminal state
+            if (!battleOver)
+            {
+                inputReady = false;
+            }
         }
 
         public int GetInput()

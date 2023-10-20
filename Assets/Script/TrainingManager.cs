@@ -69,9 +69,9 @@ namespace Footsies
             // Otherwise, for the TrainingRemoteActor agents, the socket will be filled with state messages, with only one of them being up-to-date
             if (actorP1.Ready())
             {
-                actorP1.UpdateCurrentState(state);
+                actorP1.UpdateCurrentState(state, battleOver);
 
-                // Request another action from the training agent, as long as the environment hasn't terminated and the previous input request has been dealt with
+                // Request another action from the training agent, as long as the environment hasn't terminated
                 if (!battleOver)
                 {
                     actorP1.RequestNextInput();
@@ -80,7 +80,7 @@ namespace Footsies
 
             if (actorP2.Ready())
             {
-                actorP2.UpdateCurrentState(state);
+                actorP2.UpdateCurrentState(state, battleOver);
 
                 if (!battleOver)
                 {

@@ -4,7 +4,7 @@ import json
 import subprocess
 import gymnasium as gym
 from os import path
-from math import log
+from typing import Any, Callable, Tuple
 from time import sleep, monotonic
 from gymnasium import spaces
 from ..state import FootsiesState
@@ -13,7 +13,9 @@ from .exceptions import FootsiesGameClosedError
 
 # TODO: move training agent input reading (through socket comms) to Update() instead of FixedUpdate()
 # TODO: dynamically change the game's timeScale value depending on the estimated framerate
-# TODO: self-play support
+# TODO: fix missing every even/odd frames when non-sync
+# TODO: allow human play against agent
+# TODO: actually correct socket receive
 
 MAX_STATE_MESSAGE_BYTES = 4096
 
@@ -31,6 +33,8 @@ class FootsiesEnv(gym.Env):
         fast_forward: bool = True,
         synced: bool = True,
         by_example: bool = False,
+        opponent: Callable[[dict], Tuple[bool, bool, bool]] = None,
+        opponent_port: int = 11001,
         log_file: str = None,
         log_file_overwrite: bool = False,
     ):
@@ -55,6 +59,10 @@ class FootsiesEnv(gym.Env):
             whether to wait for the agent's input before proceeding in the environment. It doesn't make much sense to let both `fast_forward` to be `True` and `synced` be `False`
         by_example: bool
             whether to simply observe another autonomous player play the game. Actions passed in `step()` are ignored
+        opponent: Callable[[dict], Tuple[bool, bool, bool]]
+            if not `None`, it's the policy to be followed by the agent's opponent. It's recommended that the environment is `synced` if a policy is supplied, since both the agent and the opponent will be acting at the same time
+        opponent_port: int
+            if an opponent policy is supplied, then this is the game's port to which the opponent's actions are sent
         log_file: str
             path of the log file to which the FOOTSIES instance logs will be written. If `None` logs will be written to the default Unity location
         log_file_overwrite: bool
@@ -66,21 +74,34 @@ class FootsiesEnv(gym.Env):
         self.fast_forward = fast_forward
         self.synced = synced
         self.by_example = by_example
+        self.opponent = opponent
+        self.opponent_port = opponent_port
         self.log_file = log_file
         self.log_file_overwrite = log_file_overwrite
 
         # Create a queue containing the last `frame_delay` frames so that we can send delayed frames to the agent
         # The actual capacity has one extra space to accomodate for the case that `frame_delay` is 0, so that
         # the only state to send (the most recent one) can be effectively sent through the queue
-        self.delayed_frame_queue: deque[FootsiesState] = deque([], maxlen=frame_delay + 1)
+        self.delayed_frame_queue: deque[FootsiesState] = deque(
+            [], maxlen=frame_delay + 1
+        )
 
         assert render_mode is None or render_mode in self.metadata["render_modes"]
         self.render_mode = render_mode
 
         self.comm = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.comm.setblocking(True)
-        self._game_instance = None
         self._connected = False
+        self._game_instance = None
+
+        self.opponent_comm = (
+            socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            if self.opponent is not None
+            else None
+        )
+        if self.opponent_comm is not None:
+            self.opponent_comm.setblocking(True)
+        self._opponent_connected = False
 
         # Don't consider the end-of-round moves
         relevant_moves = set(FootsiesMove) - {FootsiesMove.WIN, FootsiesMove.DEAD}
@@ -93,7 +114,9 @@ class FootsiesEnv(gym.Env):
                 "move": spaces.MultiDiscrete(
                     [len(relevant_moves), len(relevant_moves)]
                 ),
-                "move_frame": spaces.Box(low=0.0, high=maximum_move_duration, shape=(2,)),
+                "move_frame": spaces.Box(
+                    low=0.0, high=maximum_move_duration, shape=(2,)
+                ),
                 "position": spaces.Box(low=-4.4, high=4.4, shape=(2,)),
             }
         )
@@ -116,9 +139,9 @@ class FootsiesEnv(gym.Env):
                 self.game_path,
                 "--mute",
                 "--training",
-                "--address",
+                "--p1-address",
                 self.game_address,
-                "--port",
+                "--p1-port",
                 str(self.game_port),
             ]
             if self.render_mode is None:
@@ -128,7 +151,19 @@ class FootsiesEnv(gym.Env):
             if self.synced:
                 args.append("--synced")
             if self.by_example:
-                args.append("--by-example")
+                args.append("--p1-bot")
+            if self.opponent is None:
+                args.append("--p2-bot")
+            else:
+                args.extend(
+                    [
+                        "--p2-address",
+                        self.game_address,
+                        "--p2-port",
+                        str(self.opponent_port),
+                        "--p2-no-state",
+                    ]
+                )
             if self.log_file is not None:
                 if not self.log_file_overwrite and path.exists(self.log_file):
                     raise FileExistsError(
@@ -144,7 +179,9 @@ class FootsiesEnv(gym.Env):
         """
         Connect to the FOOTSIES instance specified by the environment's address and port.
         If the connection is refused, wait `retry_delay` seconds before trying again.
-        No-op if already connected
+        No-op if already connected.
+
+        If an opponent was supplied, then try establishing a connection for the opponent as well.
         """
         while not self._connected:
             try:
@@ -156,6 +193,18 @@ class FootsiesEnv(gym.Env):
                     retry_delay
                 )  # avoid constantly pestering the game for a connection
                 continue
+
+        if self.opponent is not None:
+            while not self._opponent_connected:
+                try:
+                    self.opponent_comm.connect((self.game_address, self.opponent_port))
+                    self._opponent_connected = True
+
+                except ConnectionRefusedError:
+                    sleep(
+                        retry_delay
+                    )  # avoid constantly pestering the game for a connection
+                    continue
 
     def _receive_and_update_state(self) -> FootsiesState:
         """Receive the environment state from the FOOTSIES instance"""
@@ -172,11 +221,16 @@ class FootsiesEnv(gym.Env):
 
         return self._current_state
 
-    def _send_action(self, action: "tuple[bool, bool, bool]"):
+    def _send_action(
+        self, action: "tuple[bool, bool, bool]", is_opponent: bool = False
+    ):
         """Send an action to the FOOTSIES instance"""
         action_message = bytearray(action)
         try:
-            self.comm.sendall(action_message)
+            if is_opponent:
+                self.opponent_comm.sendall(action_message)
+            else:
+                self.comm.sendall(action_message)
         except OSError:
             raise FootsiesGameClosedError
 
@@ -222,22 +276,37 @@ class FootsiesEnv(gym.Env):
             # Give the agent the same initial state but repeated (`frame_delay` - 1) times
             self.delayed_frame_queue.append(first_state)
 
-        return self._extract_obs(first_state), self._extract_info(first_state)
+        self._last_passed_observation = self._extract_obs(first_state)
+        return self._last_passed_observation, self._extract_info(first_state)
 
     # Step already assumes that the queue of delayed frames is full from reset()
     def step(
         self, action: "tuple[bool, bool, bool]"
     ) -> "tuple[dict, float, bool, bool, dict]":
         # Send action
-        self._send_action(action)
+        self._send_action(action, is_opponent=False)
+        if self.opponent is not None:
+            opponent_action = self.opponent(self._last_passed_observation)
+            self._send_action(opponent_action, is_opponent=True)
 
         # Store the most recent state first and then take the oldest one
         most_recent_state = self._receive_and_update_state()
         self.delayed_frame_queue.append(most_recent_state)
         state = self.delayed_frame_queue.popleft()
 
-        state.p1_move = state.p1_move if state.p1_move not in {FootsiesMove.DEAD.value.id, FootsiesMove.WIN.value.id} else FootsiesMove.STAND.value.id
-        state.p2_move = state.p2_move if state.p2_move not in {FootsiesMove.DEAD.value.id, FootsiesMove.WIN.value.id} else FootsiesMove.STAND.value.id
+        # In the terminal state, the defeated opponent gets into a move (DEAD) that doesn't occur throughout the game, so in that case we default to STAND
+        state.p1_move = (
+            state.p1_move
+            if state.p1_move
+            not in {FootsiesMove.DEAD.value.id, FootsiesMove.WIN.value.id}
+            else FootsiesMove.STAND.value.id
+        )
+        state.p2_move = (
+            state.p2_move
+            if state.p2_move
+            not in {FootsiesMove.DEAD.value.id, FootsiesMove.WIN.value.id}
+            else FootsiesMove.STAND.value.id
+        )
 
         # Get next observation, info and reward
         obs = self._extract_obs(state)
@@ -249,11 +318,39 @@ class FootsiesEnv(gym.Env):
         else:
             reward = 0
 
+        self._last_passed_observation = obs
         # Environment is never truncated
         return obs, reward, terminated, False, info
 
     def close(self):
         self.comm.close()  # game should close as well after socket is closed
+        if self.opponent is not None:
+            self.opponent_comm.close()
+
+    def hard_reset(self):
+        """Reset the entire environment, closing the socket connections and the game. The next `reset()` call will recreate these resources"""
+        self.close()
+
+        self.opponent_comm = (
+            socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            if self.opponent is not None
+            else None
+        )
+        if self.opponent_comm is not None:
+            self.opponent_comm.setblocking(True)
+
+        self._connected = False
+        self._opponent_connected = False
+        self._game_instance = None
+
+    def set_opponent(self, opponent: Callable[[dict], Tuple[bool, bool, bool]]):
+        """
+        Set the agent's opponent to the specified custom policy, or `None` if the default environment opponent should be used.
+
+        WARNING: will cause a hard reset on the environment, closing the socket connections and the game!
+        """
+        self.opponent = opponent
+        self.hard_reset()
 
 
 if __name__ == "__main__":

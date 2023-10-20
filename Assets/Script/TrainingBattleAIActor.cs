@@ -29,6 +29,6 @@ namespace Footsies
         }
 
         // don't care didn't ask
-        public void UpdateCurrentState(EnvironmentState state) {}
+        public void UpdateCurrentState(EnvironmentState state, bool battleOver) {}
     }
 }
