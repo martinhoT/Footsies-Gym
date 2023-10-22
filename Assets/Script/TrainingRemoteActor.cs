@@ -71,7 +71,10 @@ namespace Footsies
             {
                 string stateJson = JsonUtility.ToJson(state);
                 Debug.Log("Sending the game's current state...");
-                trainingSocket.SendAsync(Encoding.UTF8.GetBytes(stateJson), SocketFlags.None);
+                if (synced)
+                    trainingSocket.Send(Encoding.UTF8.GetBytes(stateJson), SocketFlags.None);
+                else
+                    trainingSocket.SendAsync(Encoding.UTF8.GetBytes(stateJson), SocketFlags.None);
                 Debug.Log("Current state received by the agent! (frame: " + state.globalFrame + ")");
             }
 
@@ -93,7 +96,10 @@ namespace Footsies
             if (!inputReady && !inputRequested)
             {
                 inputRequested = true;
-                ReceiveTrainingInput();
+                if (synced)
+                    ReceiveTrainingInput();
+                else
+                    ReceiveTrainingInputAsync();
             }
             else {
                 Debug.Log("ERROR: training input request could not be performed!");
@@ -105,14 +111,42 @@ namespace Footsies
             return !synced || inputReady;
         }
 
-        private async void ReceiveTrainingInput()
+        private void ReceiveTrainingInput()
+        {
+            byte[] actionMessageContent = {0, 0, 0};
+            ArraySegment<byte> actionMessage = new ArraySegment<byte>(actionMessageContent);
+
+            Debug.Log("Waiting for the agent's action...");
+            int bytesReceived = trainingSocket.Receive(actionMessage, SocketFlags.None);
+            Debug.Log("Agent action received! (" + (int)actionMessageContent[0] + ", " + (int)actionMessageContent[1] + ", " + (int)actionMessageContent[2] + ")");
+            // EOF has been reached, communication has likely been stopped on the agent's side
+            if (bytesReceived == 0)
+            {
+                Debug.Log("Training agent has ceased communication, quitting...");
+                Application.Quit();
+            }
+            else if (bytesReceived != 3)
+            {
+                Debug.Log("ERROR: abnormal number of bytes received from agent's action message (sent " + bytesReceived + ", expected 3)");
+            }
+            
+            input = 0;
+            input |= actionMessageContent[0] != 0 ? (int)InputDefine.Left : 0;
+            input |= actionMessageContent[1] != 0 ? (int)InputDefine.Right : 0;
+            input |= actionMessageContent[2] != 0 ? (int)InputDefine.Attack : 0;
+
+            inputRequested = false;
+            inputReady = true;
+        }
+
+        private async void ReceiveTrainingInputAsync()
         {
             byte[] actionMessageContent = {0, 0, 0};
             ArraySegment<byte> actionMessage = new ArraySegment<byte>(actionMessageContent);
 
             Debug.Log("Waiting for the agent's action...");
             int bytesReceived = await trainingSocket.ReceiveAsync(actionMessage, SocketFlags.None);
-            Debug.Log("Agent action received! (" + (int)actionMessageContent[0] + ", " + (int)actionMessageContent[1] + ", " + (int)actionMessageContent[2] + ")");
+            Debug.Log("Agent action received ASYNC! (" + (int)actionMessageContent[0] + ", " + (int)actionMessageContent[1] + ", " + (int)actionMessageContent[2] + ")");
             // EOF has been reached, communication has likely been stopped on the agent's side
             if (bytesReceived == 0)
             {
