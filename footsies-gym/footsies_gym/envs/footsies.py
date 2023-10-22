@@ -35,6 +35,7 @@ class FootsiesEnv(gym.Env):
         by_example: bool = False,
         opponent: Callable[[dict], Tuple[bool, bool, bool]] = None,
         opponent_port: int = 11001,
+        vs_player: bool = False,
         log_file: str = None,
         log_file_overwrite: bool = False,
     ):
@@ -63,11 +64,16 @@ class FootsiesEnv(gym.Env):
             if not `None`, it's the policy to be followed by the agent's opponent. It's recommended that the environment is `synced` if a policy is supplied, since both the agent and the opponent will be acting at the same time
         opponent_port: int
             if an opponent policy is supplied, then this is the game's port to which the opponent's actions are sent
+        vs_player: bool
+            whether to play against a human opponent (who will play as P2). It doesn't make much sense to let `fast_forward` be `True`. Not allowed if `opponent` is specified
         log_file: str
             path of the log file to which the FOOTSIES instance logs will be written. If `None` logs will be written to the default Unity location
         log_file_overwrite: bool
             whether to overwrite the specified log file if it already exists
         """
+        if opponent is not None and vs_player:
+            raise ValueError("custom opponent and human opponent can't be specified together")
+
         self.game_path = game_path
         self.game_address = game_address
         self.game_port = game_port
@@ -76,6 +82,7 @@ class FootsiesEnv(gym.Env):
         self.by_example = by_example
         self.opponent = opponent
         self.opponent_port = opponent_port
+        self.vs_player = vs_player
         self.log_file = log_file
         self.log_file_overwrite = log_file_overwrite
 
@@ -152,7 +159,9 @@ class FootsiesEnv(gym.Env):
                 args.append("--synced")
             if self.by_example:
                 args.append("--p1-bot")
-            if self.opponent is None:
+            if self.vs_player:
+                args.append("--p2-player")
+            elif self.opponent is None:
                 args.append("--p2-bot")
             else:
                 args.extend(
@@ -354,7 +363,7 @@ class FootsiesEnv(gym.Env):
 
 
 if __name__ == "__main__":
-    env = FootsiesEnv(game_path="Build/FOOTSIES.x86_64", render_mode=None)
+    env = FootsiesEnv(game_path="Build/FOOTSIES.exe", render_mode="human", vs_player=True, fast_forward=False, log_file="out.log", log_file_overwrite=True)
 
     # Keep track of how many frames/steps were processed each second so that we can adjust how fast the game runs
     frames = 0

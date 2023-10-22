@@ -32,9 +32,11 @@ namespace Footsies
             bool argIsTrainingEnv = false;
             bool argIsTrainingEnvSynced = false;
             bool argP1Bot = false;
+            bool argP1Player = false;
             string argP1TrainingAddress = "localhost";
             int argP1TrainingPort = 11000;
             bool argP2Bot = false;
+            bool argP2Player = false;
             bool argP1NoState = false;
             string argP2TrainingAddress = "localhost";
             int argP2TrainingPort = 11001;
@@ -65,6 +67,14 @@ namespace Footsies
                         
                     case "--p2-bot":
                         argP2Bot = true;
+                        break;
+                    
+                    case "--p1-player":
+                        argP1Player = true;
+                        break;
+
+                    case "--p2-player":
+                        argP2Player = true;
                         break;
 
                     case "--mute":
@@ -104,10 +114,12 @@ namespace Footsies
                 + "   Synced? " + argIsTrainingEnvSynced + "\n"
                 + "   Mute? " + shouldMute + "\n"
                 + "   P1 Bot? " + argP1Bot + "\n"
+                + "   P1 Player? " + argP1Player + "\n"
                 + "   P1 Training address: " + argP1TrainingAddress + "\n"
                 + "   P1 Training port: " + argP1TrainingPort + "\n"
                 + "   Send environment state to P1? " + !argP1NoState + "\n"
                 + "   P2 Bot? " + argP2Bot + "\n"
+                + "   P2 Player? " + argP2Player + "\n"
                 + "   P2 Training address: " + argP2TrainingAddress + "\n"
                 + "   P2 Training port: " + argP2TrainingPort + "\n"
                 + "   Send environment state to P2? " + !argP2NoState + "\n"
@@ -121,8 +133,8 @@ namespace Footsies
             }
 
             trainingManager = new TrainingManager(argIsTrainingEnv, argIsTrainingEnvSynced, 
-                argP1Bot ? null : new TrainingRemoteActor(argP1TrainingAddress, argP1TrainingPort, argIsTrainingEnvSynced, argP1NoState),
-                argP2Bot ? null : new TrainingRemoteActor(argP2TrainingAddress, argP2TrainingPort, argIsTrainingEnvSynced, argP2NoState)
+                argP1Bot ? null : (argP1Player ? new TrainingPlayerActor(true) : new TrainingRemoteActor(argP1TrainingAddress, argP1TrainingPort, argIsTrainingEnvSynced, argP1NoState)),
+                argP2Bot ? null : (argP2Player ? new TrainingPlayerActor(false) : new TrainingRemoteActor(argP2TrainingAddress, argP2TrainingPort, argIsTrainingEnvSynced, argP2NoState))
             );
         }
 
