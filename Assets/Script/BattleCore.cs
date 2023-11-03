@@ -430,7 +430,9 @@ namespace Footsies
                     fighter2.currentActionFrame, // p2MoveFrame
                     fighter1.position.x, // p1Position
                     fighter2.position.x, // p2Position
-                    frameCount // globalFrame
+                    frameCount, // globalFrame
+                    recordingP1Input[currentRecordingInputIndex - 1].input, // p1MostRecentAction
+                    recordingP2Input[currentRecordingInputIndex - 1].input // p2MostRecentAction
                 );
             }
             else
@@ -446,6 +448,8 @@ namespace Footsies
                 currentEnvironmentState.p1Position = fighter1.position.x;
                 currentEnvironmentState.p2Position = fighter2.position.x;
                 currentEnvironmentState.globalFrame = frameCount;
+                currentEnvironmentState.p1MostRecentAction = recordingP1Input[currentRecordingInputIndex - 1].input;
+                currentEnvironmentState.p2MostRecentAction = recordingP2Input[currentRecordingInputIndex - 1].input;
             }
             
         }
