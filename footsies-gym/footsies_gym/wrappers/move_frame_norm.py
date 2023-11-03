@@ -2,7 +2,10 @@ import gymnasium as gym
 from gymnasium import spaces
 from ..moves import FootsiesMove, footsies_move_index_to_move
 
+
 class FootsiesMoveFrameNormalized(gym.ObservationWrapper):
+    """Normalizes move frame durations to be between `0` and `1`, inclusive. `0` indicates the start of the move, while `1` indicates the end of it"""
+
     def __init__(self, env):
         super().__init__(env)
         relevant_moves = set(FootsiesMove) - {FootsiesMove.WIN, FootsiesMove.DEAD}
@@ -18,6 +21,12 @@ class FootsiesMoveFrameNormalized(gym.ObservationWrapper):
         )
 
     def observation(self, obs):
-        obs["move_frame"][0] = obs["move_frame"][0] / footsies_move_index_to_move[obs["move"][0]].value.duration
-        obs["move_frame"][1] = obs["move_frame"][1] / footsies_move_index_to_move[obs["move"][1]].value.duration
+        obs["move_frame"][0] = (
+            obs["move_frame"][0]
+            / footsies_move_index_to_move[obs["move"][0]].value.duration
+        )
+        obs["move_frame"][1] = (
+            obs["move_frame"][1]
+            / footsies_move_index_to_move[obs["move"][1]].value.duration
+        )
         return obs
