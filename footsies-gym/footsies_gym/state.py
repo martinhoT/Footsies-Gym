@@ -44,14 +44,14 @@ class FootsiesState:
         self.p2_position = p2Position
         self.global_frame = globalFrame
         self.p1_most_recent_action = (
-            (p1MostRecentAction & 4) != 0,
-            (p1MostRecentAction & 2) != 0,
             (p1MostRecentAction & 1) != 0,
+            (p1MostRecentAction & 2) != 0,
+            (p1MostRecentAction & 4) != 0,
         )
         self.p2_most_recent_action = (
-            (p2MostRecentAction & 4) != 0,
-            (p2MostRecentAction & 2) != 0,
             (p2MostRecentAction & 1) != 0,
+            (p2MostRecentAction & 2) != 0,
+            (p2MostRecentAction & 4) != 0,
         )
 
     def __str__(self):

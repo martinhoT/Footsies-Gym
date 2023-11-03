@@ -128,7 +128,7 @@ class FootsiesEnv(gym.Env):
             }
         )
 
-        # 3 actions, which can be combined: attack, right, left
+        # 3 actions, which can be combined: left, right, attack
         self.action_space = spaces.MultiBinary(3)
 
         # -1 for losing, 1 for winning, 0 otherwise
@@ -339,7 +339,8 @@ class FootsiesEnv(gym.Env):
         self.comm.close() # game should close as well after socket is closed
         if self.opponent is not None:
             self.opponent_comm.close()
-        self._game_instance.kill() # just making sure the game is closed
+        if self._game_instance is not None:
+            self._game_instance.kill() # just making sure the game is closed
 
     def hard_reset(self):
         """Reset the entire environment, closing the socket connections and the game. The next `reset()` call will recreate these resources"""
@@ -378,7 +379,7 @@ class FootsiesEnv(gym.Env):
 
 if __name__ == "__main__":
     env = FootsiesEnv(
-        game_path="Build/FOOTSIES.exe",
+        game_path="Build/FOOTSIES.x86_64",
         render_mode="human",
         vs_player=True,
         fast_forward=False,
