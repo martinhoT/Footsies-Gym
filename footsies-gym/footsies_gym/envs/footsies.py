@@ -4,7 +4,7 @@ import json
 import subprocess
 import gymnasium as gym
 from os import path
-from typing import Any, Callable, Tuple
+from typing import Callable, Tuple
 from time import sleep, monotonic
 from gymnasium import spaces
 from ..state import FootsiesState
@@ -249,13 +249,13 @@ class FootsiesEnv(gym.Env):
         p1_move_frame_simple = (
             0
             if state.p1_move
-            in {FootsiesMove.STAND, FootsiesMove.FORWARD, FootsiesMove.BACKWARD}
+            in {FootsiesMove.STAND.value.id, FootsiesMove.FORWARD.value.id, FootsiesMove.BACKWARD.value.id}
             else state.p1_move_frame
         )
         p2_move_frame_simple = (
             0
             if state.p2_move
-            in {FootsiesMove.STAND, FootsiesMove.FORWARD, FootsiesMove.BACKWARD}
+            in {FootsiesMove.STAND.value.id, FootsiesMove.FORWARD.value.id, FootsiesMove.BACKWARD.value.id}
             else state.p2_move_frame
         )
 
