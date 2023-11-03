@@ -128,7 +128,7 @@ class FootsiesEnv(gym.Env):
             }
         )
 
-        # 3 actions, which can be combined: left, right, attack
+        # 3 actions, which can be combined: attack, right, left
         self.action_space = spaces.MultiBinary(3)
 
         # -1 for losing, 1 for winning, 0 otherwise
@@ -332,13 +332,17 @@ class FootsiesEnv(gym.Env):
         return obs, reward, terminated, False, info
 
     def close(self):
-        self.comm.close()  # game should close as well after socket is closed
+        self.comm.close() # game should close as well after socket is closed
         if self.opponent is not None:
             self.opponent_comm.close()
+        self._game_instance.kill() # just making sure the game is closed
 
     def hard_reset(self):
         """Reset the entire environment, closing the socket connections and the game. The next `reset()` call will recreate these resources"""
         self.close()
+
+        self.comm = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.comm.setblocking(True)
 
         self.opponent_comm = (
             socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -356,10 +360,16 @@ class FootsiesEnv(gym.Env):
         """
         Set the agent's opponent to the specified custom policy, or `None` if the default environment opponent should be used.
 
-        WARNING: will cause a hard reset on the environment, closing the socket connections and the game!
+        WARNING: will cause a hard reset on the environment if changing between the environment's AI and the custom opponent, closing the socket connections and the game!
+        There is no hard reset if merely changing custom opponent policies.
         """
+        require_hard_reset = (opponent is not None and self.opponent is None) or (opponent is None and self.opponent is not None)
+        
+        # This internal variable needs to be updated before hard-resetting
         self.opponent = opponent
-        self.hard_reset()
+
+        if require_hard_reset:
+            self.hard_reset()
 
 
 if __name__ == "__main__":
