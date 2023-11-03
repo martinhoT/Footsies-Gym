@@ -13,8 +13,6 @@ from .exceptions import FootsiesGameClosedError
 
 # TODO: move training agent input reading (through socket comms) to Update() instead of FixedUpdate()
 # TODO: dynamically change the game's timeScale value depending on the estimated framerate
-# TODO: fix missing every even/odd frames when non-sync
-# TODO: allow human play against agent
 # TODO: actually correct socket receive
 
 MAX_STATE_MESSAGE_BYTES = 4096
@@ -72,7 +70,9 @@ class FootsiesEnv(gym.Env):
             whether to overwrite the specified log file if it already exists
         """
         if opponent is not None and vs_player:
-            raise ValueError("custom opponent and human opponent can't be specified together")
+            raise ValueError(
+                "custom opponent and human opponent can't be specified together"
+            )
 
         self.game_path = game_path
         self.game_address = game_address
@@ -271,7 +271,11 @@ class FootsiesEnv(gym.Env):
 
     def _extract_info(self, state: FootsiesState) -> dict:
         """Get the current additional info from the environment state"""
-        return {"frame": state.global_frame}
+        return {
+            "frame": state.global_frame,
+            "p1_action": state.p1_most_recent_action,
+            "p2_action": state.p2_most_recent_action,
+        }
 
     def reset(self, *, seed: int = None, options: dict = None) -> "tuple[dict, dict]":
         self.delayed_frame_queue.clear()
@@ -363,7 +367,15 @@ class FootsiesEnv(gym.Env):
 
 
 if __name__ == "__main__":
-    env = FootsiesEnv(game_path="Build/FOOTSIES.exe", render_mode="human", vs_player=True, fast_forward=False, log_file="out.log", log_file_overwrite=True)
+    env = FootsiesEnv(
+        game_path="Build/FOOTSIES.exe",
+        render_mode="human",
+        vs_player=True,
+        fast_forward=False,
+        log_file="out.log",
+        log_file_overwrite=True,
+        frame_delay=0,
+    )
 
     # Keep track of how many frames/steps were processed each second so that we can adjust how fast the game runs
     frames = 0
@@ -389,6 +401,8 @@ if __name__ == "__main__":
                     f"Episode {episode_counter:>3} | {0 if seconds == 0 else frames / seconds:>3.2f} fps",
                     end="\r",
                 )
+                # action_to_string = lambda t: " ".join(("O" if a else " ") for a in t)
+                # print(f"P1: {action_to_string(info['p1_action']):} | P2: {action_to_string(info['p2_action'])}")
             episode_counter += 1
 
     except KeyboardInterrupt:
