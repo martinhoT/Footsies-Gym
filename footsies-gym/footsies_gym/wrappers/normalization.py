@@ -4,7 +4,7 @@ from ..moves import FootsiesMove, footsies_move_index_to_move
 
 
 class FootsiesNormalized(gym.ObservationWrapper):
-    """Normalizes all observation space variables
+    """Normalizes all observation space variables. Wrapper should be applied to the base FOOTSIES environment before any observation flattening
     
     Move frame durations will be between `0` and `1`, inclusive. `0` indicates the start of the move, while `1` indicates the end of it
     """
@@ -24,8 +24,10 @@ class FootsiesNormalized(gym.ObservationWrapper):
         )
 
     def observation(self, obs):
-        obs["guard"] /= 3.0
-        obs["position"] /= 4.4
+        obs["guard"][0] /= 3.0
+        obs["guard"][1] /= 3.0
+        obs["position"][0] /= 4.4
+        obs["position"][1] /= 4.4
         obs["move_frame"][0] = (
             obs["move_frame"][0]
             / footsies_move_index_to_move[obs["move"][0]].value.duration

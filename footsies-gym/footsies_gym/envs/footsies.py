@@ -34,6 +34,7 @@ class FootsiesEnv(gym.Env):
         opponent: Callable[[dict], Tuple[bool, bool, bool]] = None,
         opponent_port: int = 11001,
         vs_player: bool = False,
+        dense_reward: bool = False,
         log_file: str = None,
         log_file_overwrite: bool = False,
     ):
@@ -64,10 +65,14 @@ class FootsiesEnv(gym.Env):
             if an opponent policy is supplied, then this is the game's port to which the opponent's actions are sent
         vs_player: bool
             whether to play against a human opponent (who will play as P2). It doesn't make much sense to let `fast_forward` be `True`. Not allowed if `opponent` is specified
+        dense_reward: bool
+            whether to use dense reward on the environment, rather than sparse reward. Sparse reward only rewards the agent on win or loss (1 and -1, respectively). Dense reward rewards the agent on inflicting/receiving guard damage (0.3 and -0.3, respectively), but on win/loss a compensation is given such that the sum is like the sparse reward (1 and -1, respectively)
         log_file: str
             path of the log file to which the FOOTSIES instance logs will be written. If `None` logs will be written to the default Unity location
         log_file_overwrite: bool
             whether to overwrite the specified log file if it already exists
+        
+        WARNING: if the environment has an unexpected error or closes incorrectly, it's possible the game process will still be running in the background. It should be closed manually in that case
         """
         if opponent is not None and vs_player:
             raise ValueError(
@@ -83,6 +88,7 @@ class FootsiesEnv(gym.Env):
         self.opponent = opponent
         self.opponent_port = opponent_port
         self.vs_player = vs_player
+        self.dense_reward = dense_reward
         self.log_file = log_file
         self.log_file_overwrite = log_file_overwrite
 
@@ -134,7 +140,17 @@ class FootsiesEnv(gym.Env):
         # -1 for losing, 1 for winning, 0 otherwise
         self.reward_range = (-1, 1)
 
+        # Save the most recent state internally
+        # Useful to differentiate between the previous and current environment state
         self._current_state = None
+
+        # The latest observation that the agent saw
+        # Required in order to communicate to the opponent the same observation
+        self._last_passed_observation = None
+
+        # Keep track of the total reward during this episode
+        # Only used when dense rewards are enabled
+        self._cummulative_episode_reward = 0.0
 
     def _instantiate_game(self):
         """
@@ -277,8 +293,28 @@ class FootsiesEnv(gym.Env):
             "p2_action": state.p2_most_recent_action,
         }
 
+    def _get_sparse_reward(self, state: FootsiesState, next_state: FootsiesState, terminated: bool) -> float:
+        """Get the sparse reward from this environment step. Equal to 1 or -1 on win/loss, respectively"""
+        return (1 if next_state.p2_vital == 0 else -1) if terminated else 0
+
+    def _get_dense_reward(self, state: FootsiesState, next_state: FootsiesState, terminated: bool) -> float:
+        """Get the dense reward from this environment step. Sums up to 1 or -1 on win/loss, but is also given when inflicting/dealing guard damage (0.3 and -0.3, respectively)"""
+        reward = 0.0
+        if next_state.p1_guard < state.p1_guard:
+            reward -= 0.3
+        if next_state.p2_guard < state.p2_guard:
+            reward += 0.3
+
+        self._cummulative_episode_reward += reward
+
+        if terminated:
+            reward += (1 if next_state.p2_vital == 0 else -1) - self._cummulative_episode_reward
+        
+        return reward
+
     def reset(self, *, seed: int = None, options: dict = None) -> "tuple[dict, dict]":
         self.delayed_frame_queue.clear()
+        self._cummulative_episode_reward = 0.0
 
         self._instantiate_game()
         self._connect_to_game()
@@ -301,6 +337,9 @@ class FootsiesEnv(gym.Env):
         if self.opponent is not None:
             opponent_action = self.opponent(self._last_passed_observation)
             self._send_action(opponent_action, is_opponent=True)
+
+        # Save the state before the environment step for later
+        previous_state = self._current_state
 
         # Store the most recent state first and then take the oldest one
         most_recent_state = self._receive_and_update_state()
@@ -326,10 +365,7 @@ class FootsiesEnv(gym.Env):
         info = self._extract_info(state)
 
         terminated = most_recent_state.p1_vital == 0 or most_recent_state.p2_vital == 0
-        if terminated:
-            reward = 1 if most_recent_state.p2_vital == 0 else -1
-        else:
-            reward = 0
+        reward = self._get_dense_reward(previous_state, most_recent_state, terminated) if self.dense_reward else self._get_sparse_reward(previous_state, most_recent_state, terminated)
 
         self._last_passed_observation = obs
         # Environment is never truncated
