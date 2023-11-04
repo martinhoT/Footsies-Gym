@@ -12,8 +12,8 @@ class FootsiesState:
     p1_position: float
     p2_position: float
     global_frame: int
-    p1_most_recent_action: tuple[bool, bool, bool]
-    p2_most_recent_action: tuple[bool, bool, bool]
+    p1_most_recent_action: "tuple[bool, bool, bool]"
+    p2_most_recent_action: "tuple[bool, bool, bool]"
 
     # accept camel-case attributes
     def __init__(
