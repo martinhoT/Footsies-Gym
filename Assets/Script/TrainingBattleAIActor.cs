@@ -5,7 +5,13 @@ namespace Footsies
         private BattleAI battleAI;
         private int input;
 
+        public TrainingBattleAIActor() {}
+
         public TrainingBattleAIActor(BattleAI ai) {
+            battleAI = ai;
+        }
+
+        public void setAI(BattleAI ai) {
             battleAI = ai;
         }
 

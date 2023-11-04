@@ -12,8 +12,8 @@ namespace Footsies
         // Whether to wait for agent inputs when training or just keep advancing
         public bool isTrainingSynced { get; private set; } = false;
 
-        private TrainingActor actorP1;
-        private TrainingActor actorP2;
+        public TrainingActor actorP1 { get; private set; };
+        public TrainingActor actorP2 { get; private set; };
 
         private bool isAlreadySetup = false;
 
@@ -23,12 +23,6 @@ namespace Footsies
             this.actorP1 = actorP1;
             this.actorP2 = actorP2;
         }
-
-        public bool IsP1ActorSet() { return actorP1 != null; }
-        public bool IsP2ActorSet() { return actorP2 != null; }
-
-        public void SetP1Actor(TrainingActor actor) { actorP1 = actor; }
-        public void SetP2Actor(TrainingActor actor) { actorP2 = actor; }
 
         public bool Setup()
         {
