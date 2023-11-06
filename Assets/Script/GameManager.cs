@@ -136,7 +136,7 @@ namespace Footsies
                 argP1Bot ? new TrainingActorRemoteSpectator(argP1TrainingAddress, argP1TrainingPort, argIsTrainingEnvSynced)
                          : (argP1Player ? new TrainingPlayerActor(true)
                                         : new TrainingRemoteActor(argP1TrainingAddress, argP1TrainingPort, argIsTrainingEnvSynced, argP1NoState)),
-                argP2Bot ? new TrainingActorRemoteSpectator(argP1TrainingAddress, argP1TrainingPort, argIsTrainingEnvSynced)
+                argP2Bot ? new TrainingActorRemoteSpectator(argP2TrainingAddress, argP2TrainingPort, argIsTrainingEnvSynced)
                          : (argP2Player ? new TrainingPlayerActor(false)
                                         : new TrainingRemoteActor(argP2TrainingAddress, argP2TrainingPort, argIsTrainingEnvSynced, argP2NoState))
             );

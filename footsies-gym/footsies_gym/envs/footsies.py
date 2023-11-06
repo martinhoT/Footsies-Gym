@@ -333,7 +333,9 @@ class FootsiesEnv(gym.Env):
         self, action: "tuple[bool, bool, bool]"
     ) -> "tuple[dict, float, bool, bool, dict]":
         # Send action
-        self._send_action(action, is_opponent=False)
+        if not self.by_example:
+            self._send_action(action, is_opponent=False)
+        
         if self.opponent is not None:
             opponent_action = self.opponent(self._last_passed_observation)
             self._send_action(opponent_action, is_opponent=True)
@@ -415,8 +417,9 @@ class FootsiesEnv(gym.Env):
 
 if __name__ == "__main__":
     env = FootsiesEnv(
-        game_path="Build/FOOTSIES.x86_64",
+        game_path="Build/FOOTSIES.exe",
         render_mode="human",
+        by_example=True,
         vs_player=True,
         fast_forward=False,
         log_file="out.log",

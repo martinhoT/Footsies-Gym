@@ -1,8 +1,8 @@
 using UnityEngine;
-using System;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace Footsies
 {
@@ -88,8 +88,10 @@ namespace Footsies
             if (synced)
                 trainingSocket.Send(Encoding.UTF8.GetBytes(stateJson), SocketFlags.None);
             else
-                trainingSocket.SendAsync(Encoding.UTF8.GetBytes(stateJson), SocketFlags.None);
+                mostRecentAsyncStateRequest = trainingSocket.SendAsync(Encoding.UTF8.GetBytes(stateJson), SocketFlags.None);
             Debug.Log("Current state received by the spectator! (frame: " + state.globalFrame + ")");
+
+            mostRecentAsyncStateRequest = null;
         }
 
         public int GetInput()
@@ -104,7 +106,7 @@ namespace Footsies
 
         public bool Ready()
         {
-            return actor.Ready() && (!synced || (mostRecentAsyncStateRequest != null && mostRecentAsyncStateRequest.IsCompleted));
+            return actor.Ready() && (!synced || mostRecentAsyncStateRequest == null || mostRecentAsyncStateRequest.IsCompleted);
         }
     }
 }

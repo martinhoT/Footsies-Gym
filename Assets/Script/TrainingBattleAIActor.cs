@@ -11,7 +11,7 @@ namespace Footsies
             battleAI = ai;
         }
 
-        public void setAI(BattleAI ai) {
+        public void SetAI(BattleAI ai) {
             battleAI = ai;
         }
 
