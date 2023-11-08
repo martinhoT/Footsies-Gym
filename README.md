@@ -65,10 +65,10 @@ The `footsies_gym` folder is not part of the game's project. This folder contain
 The environment was only tested for Python versions +3.8.10.
 The only dependency is the `gymnasium` module ([installation instructions](https://github.com/Farama-Foundation/Gymnasium#installation)). This module doesn't officially support Windows, but it works in this project.
 
-In order to use the environment, install the `footsies_gym` module at the root of the project (using a virtual environment is recommended):
+In order to use the environment, install the `footsies-gym` module at the root of the project (using a virtual environment is recommended):
 
 ```
-pip install -e footsies_gym
+pip install -e footsies-gym
 ```
 
 ### Usage
@@ -81,11 +81,24 @@ env = gymnasium.make("FootsiesEnv-v0")
 env = FootsiesEnv(...)
 ```
 
-Make sure the environment is properly terminated (`env.close()`) so that the socket is gracefully closed.
+Make sure the environment is properly terminated (`env.close()`) so that the socket and game are gracefully closed.
+If a new episode has to be started with `env.reset()` before the environment has terminated/truncated, then `env.hard_reset()` should be called (which will close and re-open all resources).
+
+### Game command-line arguments
 
 The game binary itself accepts some command-line arguments, but they don't need to be manually specified for normal usage:
 
-- `--training`: setup the game for training (VS CPU battle with socket I/O)
+- `--training`: setup the game for training (VS CPU battle with custom training actors which serve as the players)
+- `--fast-forward`: fast-forward the game 20x
+- `--synced`: use synchronous socket communication
 - `--mute`: mute all sound
-- `--address`: the address of the socket used for training
-- `--port`: the port of the socket used for training
+- `--{p1, p2}-bot`: Player 1/2 is the in-game AI bot (`TrainingBattleAIActor`)
+- `--{p1, p2}-player`: Player 1/2 is human-controlled (`TrainingPlayerActor`)
+- `--{p1, p2}-spectator`: Player 1/2 will have a socket from which the environment state can be viewed, but actions are not specified through the socket (`TrainingActorRemoteSpectator`). This argument only makes sense in conjunction with `--{p1, p2}-bot` or `--{p1, p2}-player`
+- `--{p1, p2}-address`: the address of the socket used for training
+- `--{p1, p2}-port`: the port of the socket used for training
+- `--{p1, p2}-no-state`: specify that no environment state is to be sent to the remote player 1/2. No effect if Player 1/2 is a spectator
+
+If neither `--{p1, p2}-bot` nor `--{p1, p2}-player` are specified then Player 1/2 will be a remote actor (`TrainingRemoteActor`).
+A socket will be associated with the actor through which actions and environment state are communicated.
+
