@@ -108,15 +108,8 @@ namespace Footsies
             if (trainingManager.isTraining)
             {
                 // Awkward case, BattleCore is the only one who can setup the TrainingBattleAIActors, since only it can properly create BattleAIs
-                if (trainingManager.actorP1 is TrainingActorRemoteSpectator actorP1Remote)
-                    actorP1Remote.SetTrainingActor(new TrainingBattleAIActor(new BattleAI(this)));
-                if (trainingManager.actorP2 is TrainingActorRemoteSpectator actorP2Remote)
-                    actorP2Remote.SetTrainingActor(new TrainingBattleAIActor(new BattleAI(this)));
-                
-                if (trainingManager.actorP1 is TrainingBattleAIActor actorP1AI)
-                    actorP1AI.SetAI(new BattleAI(this));
-                if (trainingManager.actorP2 is TrainingBattleAIActor actorP2AI)
-                    actorP2AI.SetAI(new BattleAI(this));
+                GameManager.Instance.botP1?.SetAI(new BattleAI(this));
+                GameManager.Instance.botP2?.SetAI(new BattleAI(this));
 
                 trainingManager.Setup();
 

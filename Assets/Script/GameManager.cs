@@ -18,6 +18,14 @@ namespace Footsies
         public bool isVsCPU { get; private set; }
         public TrainingManager trainingManager { get; private set; }
 
+        // These two variables will contain the respective TrainingBattleAIActor, if they were instanced
+        // here in the GameManager. We provide these instances so that BattleCore can properly initialize
+        // the necessary BattleAIs. Doing it this way allows these actors to be wrapped by other
+        // TrainingActor classes (such as RemoteSpectator) while having access to the unwrapped bot for
+        // proper initialization
+        public TrainingBattleAIActor botP1 { get; private set; }
+        public TrainingBattleAIActor botP2 { get; private set; }
+
         private bool shouldMute = false;
 
         private void Awake()
@@ -33,11 +41,13 @@ namespace Footsies
             bool argIsTrainingEnvSynced = false;
             bool argP1Bot = false;
             bool argP1Player = false;
+            bool argP1Spectator = false;
             string argP1TrainingAddress = "localhost";
             int argP1TrainingPort = 11000;
+            bool argP1NoState = false;
             bool argP2Bot = false;
             bool argP2Player = false;
-            bool argP1NoState = false;
+            bool argP2Spectator = false;
             string argP2TrainingAddress = "localhost";
             int argP2TrainingPort = 11001;
             bool argP2NoState = false;
@@ -75,6 +85,14 @@ namespace Footsies
 
                     case "--p2-player":
                         argP2Player = true;
+                        break;
+
+                    case "--p1-spectator":
+                        argP1Spectator = true;
+                        break;
+
+                    case "--p2-spectator":
+                        argP2Spectator = true;
                         break;
 
                     case "--mute":
@@ -115,11 +133,13 @@ namespace Footsies
                 + "   Mute? " + shouldMute + "\n"
                 + "   P1 Bot? " + argP1Bot + "\n"
                 + "   P1 Player? " + argP1Player + "\n"
+                + "   P1 Spectator? " + argP1Spectator + "\n"
                 + "   P1 Training address: " + argP1TrainingAddress + "\n"
                 + "   P1 Training port: " + argP1TrainingPort + "\n"
                 + "   Send environment state to P1? " + !argP1NoState + "\n"
                 + "   P2 Bot? " + argP2Bot + "\n"
                 + "   P2 Player? " + argP2Player + "\n"
+                + "   P1 Spectator? " + argP2Spectator + "\n"
                 + "   P2 Training address: " + argP2TrainingAddress + "\n"
                 + "   P2 Training port: " + argP2TrainingPort + "\n"
                 + "   Send environment state to P2? " + !argP2NoState + "\n"
@@ -132,14 +152,26 @@ namespace Footsies
                 Application.targetFrameRate = 1000;
             }
 
-            trainingManager = new TrainingManager(argIsTrainingEnv, argIsTrainingEnvSynced, 
-                argP1Bot ? new TrainingActorRemoteSpectator(argP1TrainingAddress, argP1TrainingPort, argIsTrainingEnvSynced)
+            if (argP1Bot)
+                botP1 = new TrainingBattleAIActor();
+            if (argP2Bot)
+                botP2 = new TrainingBattleAIActor();
+
+            TrainingActor actorP1 = argP1Bot ? botP1
                          : (argP1Player ? new TrainingPlayerActor(true)
-                                        : new TrainingRemoteActor(argP1TrainingAddress, argP1TrainingPort, argIsTrainingEnvSynced, argP1NoState)),
-                argP2Bot ? new TrainingActorRemoteSpectator(argP2TrainingAddress, argP2TrainingPort, argIsTrainingEnvSynced)
+                                        : new TrainingRemoteActor(argP1TrainingAddress, argP1TrainingPort, argIsTrainingEnvSynced, argP1NoState));
+
+            TrainingActor actorP2 = argP2Bot ? botP2
                          : (argP2Player ? new TrainingPlayerActor(false)
-                                        : new TrainingRemoteActor(argP2TrainingAddress, argP2TrainingPort, argIsTrainingEnvSynced, argP2NoState))
-            );
+                                        : new TrainingRemoteActor(argP2TrainingAddress, argP2TrainingPort, argIsTrainingEnvSynced, argP2NoState));
+
+            // WARNING: because each player only has an address-port pair, it doesn't make sense to create a spectator of a RemoteActor
+            if (argP1Spectator)
+                actorP1 = new TrainingActorRemoteSpectator(argP1TrainingAddress, argP1TrainingPort, argIsTrainingEnvSynced, actorP1);
+            if (argP2Spectator)
+                actorP2 = new TrainingActorRemoteSpectator(argP2TrainingAddress, argP2TrainingPort, argIsTrainingEnvSynced, actorP2);
+
+            trainingManager = new TrainingManager(argIsTrainingEnv, argIsTrainingEnvSynced, actorP1, actorP2);
         }
 
         private void Start()
