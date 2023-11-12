@@ -14,7 +14,8 @@ from .exceptions import FootsiesGameClosedError
 # TODO: move training agent input reading (through socket comms) to Update() instead of FixedUpdate()
 # TODO: dynamically change the game's timeScale value depending on the estimated framerate
 # TODO: actually correct socket receive
-# TODO: implement frame skipping (skip hitstop as well)
+# TODO: investigate error of multiple state messages being sent at once even on synced environment
+# TODO: never block the game on socket communication even on synced environment
 
 MAX_STATE_MESSAGE_BYTES = 4096
 
