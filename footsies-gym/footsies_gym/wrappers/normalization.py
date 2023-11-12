@@ -23,7 +23,8 @@ class FootsiesNormalized(gym.ObservationWrapper):
             }
         )
 
-    def observation(self, obs):
+    def observation(self, obs: dict):
+        obs = obs.copy()
         obs["guard"][0] /= 3.0
         obs["guard"][1] /= 3.0
         obs["position"][0] /= 4.4
@@ -35,5 +36,22 @@ class FootsiesNormalized(gym.ObservationWrapper):
         obs["move_frame"][1] = (
             obs["move_frame"][1]
             / footsies_move_index_to_move[obs["move"][1]].value.duration
+        )
+        return obs
+
+    @staticmethod
+    def undo(obs):
+        obs = obs.copy()
+        obs["guard"][0] *= 3.0
+        obs["guard"][1] *= 3.0
+        obs["position"][0] *= 4.4
+        obs["position"][1] *= 4.4
+        obs["move_frame"][0] = (
+            obs["move_frame"][0]
+            * footsies_move_index_to_move[obs["move"][0]].value.duration
+        )
+        obs["move_frame"][1] = (
+            obs["move_frame"][1]
+            * footsies_move_index_to_move[obs["move"][1]].value.duration
         )
         return obs
