@@ -67,7 +67,8 @@ namespace Footsies
 
         public void UpdateCurrentState(EnvironmentState state, bool battleOver)
         {
-            if (!noState)
+            // We will only send the current state if the remote actor is ready to receive it, which we assume it is if it has already acted
+            if (!noState && inputReady)
             {
                 string stateJson = JsonUtility.ToJson(state);
                 Debug.Log("Sending the game's current state...");
