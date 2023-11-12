@@ -4,17 +4,18 @@ from ..moves import FootsiesMove, footsies_move_index_to_move
 
 
 class FootsiesNormalized(gym.ObservationWrapper):
-    """Normalizes all observation space variables. Wrapper should be applied to the base FOOTSIES environment before any observation flattening
-    
+    """Normalizes all observation space variables. Wrapper should be applied to the base FOOTSIES environment before any other observation wrapper
+
     Move frame durations will be between `0` and `1`, inclusive. `0` indicates the start of the move, while `1` indicates the end of it
     """
 
     def __init__(self, env):
         super().__init__(env)
         relevant_moves = set(FootsiesMove) - {FootsiesMove.WIN, FootsiesMove.DEAD}
+
         self.observation_space = spaces.Dict(
             {
-                "guard": spaces.Box(low=0.0, high=1.0, shape=(2,)),  # 0..3
+                "guard": spaces.Box(low=0.0, high=1.0, shape=(2,)),
                 "move": spaces.MultiDiscrete(
                     [len(relevant_moves), len(relevant_moves)]
                 ),

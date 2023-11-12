@@ -10,13 +10,18 @@ def get_dict_obs_from_vector_obs(
     unflattenend_observation_space: Space = None,
     normalized: bool = True,
 ) -> dict:
-    """Convert a FOOTSIES observation from a transformed version (with observation wrappers) into the original version"""
+    """
+    Convert a FOOTSIES observation from a transformed version (with observation wrappers) into the original version.
+    Doesn't work on observations that had frame skipping
+    """
 
     dict_obs = {}
 
     if flattened:
         if unflattenend_observation_space is None:
-            raise ValueError("if argument vector_obs is flattened, then the unflattened observation space needs to be provided")
+            raise ValueError(
+                "if argument vector_obs is flattened, then the unflattened observation space needs to be provided"
+            )
         dict_obs = unflatten(unflattenend_observation_space, vector_obs)
 
     # If not flattened, we assume it's a dictionary

@@ -8,7 +8,7 @@ from typing import Callable, Tuple
 from time import sleep, monotonic
 from gymnasium import spaces
 from ..state import FootsiesState
-from ..moves import FootsiesMove, footsies_move_id_to_index
+from ..moves import FootsiesMove, footsies_move_id_to_index, footsies_move_index_to_move
 from .exceptions import FootsiesGameClosedError
 
 # TODO: move training agent input reading (through socket comms) to Update() instead of FixedUpdate()
@@ -72,7 +72,7 @@ class FootsiesEnv(gym.Env):
             path of the log file to which the FOOTSIES instance logs will be written. If `None` logs will be written to the default Unity location
         log_file_overwrite: bool
             whether to overwrite the specified log file if it already exists
-        
+
         WARNING: if the environment has an unexpected error or closes incorrectly, it's possible the game process will still be running in the background. It should be closed manually in that case
         """
         if opponent is not None and vs_player:
@@ -121,7 +121,7 @@ class FootsiesEnv(gym.Env):
         relevant_moves = set(FootsiesMove) - {FootsiesMove.WIN, FootsiesMove.DEAD}
         maximum_move_duration = max(m.value.duration for m in relevant_moves)
 
-        # The observation space is divided into 2 columns, the first for player 1 and the second for player 2
+        # The observation space is divided into 2 columns, the first for player 1 (the agent) and the second for player 2
         self.observation_space = spaces.Dict(
             {
                 "guard": spaces.Box(low=0.0, high=3.0, shape=(2,)),  # 0..3
@@ -267,13 +267,21 @@ class FootsiesEnv(gym.Env):
         p1_move_frame_simple = (
             0
             if state.p1_move
-            in {FootsiesMove.STAND.value.id, FootsiesMove.FORWARD.value.id, FootsiesMove.BACKWARD.value.id}
+            in {
+                FootsiesMove.STAND.value.id,
+                FootsiesMove.FORWARD.value.id,
+                FootsiesMove.BACKWARD.value.id,
+            }
             else state.p1_move_frame
         )
         p2_move_frame_simple = (
             0
             if state.p2_move
-            in {FootsiesMove.STAND.value.id, FootsiesMove.FORWARD.value.id, FootsiesMove.BACKWARD.value.id}
+            in {
+                FootsiesMove.STAND.value.id,
+                FootsiesMove.FORWARD.value.id,
+                FootsiesMove.BACKWARD.value.id,
+            }
             else state.p2_move_frame
         )
 
@@ -295,11 +303,15 @@ class FootsiesEnv(gym.Env):
             "p2_action": state.p2_most_recent_action,
         }
 
-    def _get_sparse_reward(self, state: FootsiesState, next_state: FootsiesState, terminated: bool) -> float:
+    def _get_sparse_reward(
+        self, state: FootsiesState, next_state: FootsiesState, terminated: bool
+    ) -> float:
         """Get the sparse reward from this environment step. Equal to 1 or -1 on win/loss, respectively"""
         return (1 if next_state.p2_vital == 0 else -1) if terminated else 0
 
-    def _get_dense_reward(self, state: FootsiesState, next_state: FootsiesState, terminated: bool) -> float:
+    def _get_dense_reward(
+        self, state: FootsiesState, next_state: FootsiesState, terminated: bool
+    ) -> float:
         """Get the dense reward from this environment step. Sums up to 1 or -1 on win/loss, but is also given when inflicting/dealing guard damage (0.3 and -0.3, respectively)"""
         reward = 0.0
         if next_state.p1_guard < state.p1_guard:
@@ -310,8 +322,10 @@ class FootsiesEnv(gym.Env):
         self._cummulative_episode_reward += reward
 
         if terminated:
-            reward += (1 if next_state.p2_vital == 0 else -1) - self._cummulative_episode_reward
-        
+            reward += (
+                1 if next_state.p2_vital == 0 else -1
+            ) - self._cummulative_episode_reward
+
         return reward
 
     def reset(self, *, seed: int = None, options: dict = None) -> "tuple[dict, dict]":
@@ -337,7 +351,7 @@ class FootsiesEnv(gym.Env):
         # Send action
         if not self.by_example:
             self._send_action(action, is_opponent=False)
-        
+
         if self.opponent is not None:
             opponent_action = self.opponent(self._last_passed_observation)
             self._send_action(opponent_action, is_opponent=True)
@@ -369,18 +383,23 @@ class FootsiesEnv(gym.Env):
         info = self._extract_info(state)
 
         terminated = most_recent_state.p1_vital == 0 or most_recent_state.p2_vital == 0
-        reward = self._get_dense_reward(previous_state, most_recent_state, terminated) if self.dense_reward else self._get_sparse_reward(previous_state, most_recent_state, terminated)
+        reward = (
+            self._get_dense_reward(previous_state, most_recent_state, terminated)
+            if self.dense_reward
+            else self._get_sparse_reward(previous_state, most_recent_state, terminated)
+        )
 
         self._last_passed_observation = obs
+
         # Environment is never truncated
         return obs, reward, terminated, False, info
 
     def close(self):
-        self.comm.close() # game should close as well after socket is closed
+        self.comm.close()  # game should close as well after socket is closed
         if self.opponent is not None:
             self.opponent_comm.close()
         if self._game_instance is not None:
-            self._game_instance.kill() # just making sure the game is closed
+            self._game_instance.kill()  # just making sure the game is closed
 
     def hard_reset(self):
         """Reset the entire environment, closing the socket connections and the game. The next `reset()` call will recreate these resources"""
@@ -408,8 +427,10 @@ class FootsiesEnv(gym.Env):
         WARNING: will cause a hard reset on the environment if changing between the environment's AI and the custom opponent, closing the socket connections and the game!
         There is no hard reset if merely changing custom opponent policies.
         """
-        require_hard_reset = (opponent is not None and self.opponent is None) or (opponent is None and self.opponent is not None)
-        
+        require_hard_reset = (opponent is not None and self.opponent is None) or (
+            opponent is None and self.opponent is not None
+        )
+
         # This internal variable needs to be updated before hard-resetting
         self.opponent = opponent
 
