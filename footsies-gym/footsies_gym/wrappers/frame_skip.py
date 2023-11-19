@@ -36,7 +36,6 @@ class FootsiesFrameSkipped(gym.Wrapper):
 
     def _frame_skip_obs(self, state_dict: dict) -> dict:
         """From the extracted observation data, transform it in case we are using frame skipping"""
-        print(state_dict)
         return {
             "guard": state_dict["guard"],
             "move": state_dict["move"][1],
@@ -47,11 +46,14 @@ class FootsiesFrameSkipped(gym.Wrapper):
     def _is_obs_skippable(self, state_dict: dict) -> bool:
         """From the extracted observation data, check whether the observation is skippable, i.e. the agent can't act on it"""
         p1_move = footsies_move_index_to_move[state_dict["move"][0]]
+        p2_move = footsies_move_index_to_move[state_dict["move"][1]]
+        hit_guard_moves = {FootsiesMove.DAMAGE, FootsiesMove.GUARD_STAND, FootsiesMove.GUARD_CROUCH, FootsiesMove.GUARD_M, FootsiesMove.GUARD_BREAK}
 
         return (
-            state_dict["move_frame"][0] != 0.0
-            or p1_move  # player 1 is in the middle of a move. We are assuming the move's progress is simplified (always 0 for instantaneous actions)
-            == FootsiesMove.DAMAGE  # player 1 is being hit
+            # player 1 is in the middle of a move (that hasn't hit the opponent yet!). We are assuming the move's progress is simplified (always 0 for instantaneous actions)
+            (state_dict["move_frame"][0] != 0.0 and (p2_move not in hit_guard_moves))
+            # player 1 is being hit
+            or p1_move == FootsiesMove.DAMAGE
         )
 
     def reset(self, *, seed, options):
