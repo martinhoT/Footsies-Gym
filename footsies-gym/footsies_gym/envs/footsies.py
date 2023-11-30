@@ -287,13 +287,13 @@ class FootsiesEnv(gym.Env):
         )
 
         return {
-            "guard": [state.p1_guard, state.p2_guard],
-            "move": [
+            "guard": (state.p1_guard, state.p2_guard),
+            "move": (
                 footsies_move_id_to_index[state.p1_move],
                 footsies_move_id_to_index[state.p2_move],
-            ],
-            "move_frame": [p1_move_frame_simple, p2_move_frame_simple],
-            "position": [state.p1_position, state.p2_position],
+            ),
+            "move_frame": (p1_move_frame_simple, p2_move_frame_simple),
+            "position": (state.p1_position, state.p2_position),
         }
 
     def _extract_info(self, state: FootsiesState) -> dict:
@@ -342,8 +342,10 @@ class FootsiesEnv(gym.Env):
             # Give the agent the same initial state but repeated (`frame_delay` - 1) times
             self.delayed_frame_queue.append(first_state)
 
-        self._last_passed_observation = self._extract_obs(first_state)
-        return self._last_passed_observation, self._extract_info(first_state)
+        obs = self._extract_obs(first_state)
+        # Create a copy of this observation (make sure it's not edited because 'obs' was changed afterwards, which may happen with wrappers)
+        self._last_passed_observation = obs.copy()
+        return obs, self._extract_info(first_state)
 
     # Step already assumes that the queue of delayed frames is full from reset()
     def step(
@@ -390,14 +392,15 @@ class FootsiesEnv(gym.Env):
             else self._get_sparse_reward(previous_state, most_recent_state, terminated)
         )
 
-        self._last_passed_observation = obs
+        # Create a copy of this observation, as is done in reset()
+        self._last_passed_observation = obs.copy()
 
         # Environment is never truncated
         return obs, reward, terminated, False, info
 
     def close(self):
         self.comm.close()  # game should close as well after socket is closed
-        if self.opponent is not None:
+        if self.opponent_comm is not None:
             self.opponent_comm.close()
         if self._game_instance is not None:
             self._game_instance.kill()  # just making sure the game is closed
@@ -421,9 +424,10 @@ class FootsiesEnv(gym.Env):
         self._opponent_connected = False
         self._game_instance = None
 
-    def set_opponent(self, opponent: Callable[[dict], Tuple[bool, bool, bool]]):
+    def set_opponent(self, opponent: Callable[[dict], Tuple[bool, bool, bool]]) -> bool:
         """
         Set the agent's opponent to the specified custom policy, or `None` if the default environment opponent should be used.
+        Returns whether the environment requires calling `reset(...)` after calling this method.
 
         WARNING: will cause a hard reset on the environment if changing between the environment's AI and the custom opponent, closing the socket connections and the game!
         There is no hard reset if merely changing custom opponent policies.
@@ -437,6 +441,8 @@ class FootsiesEnv(gym.Env):
 
         if require_hard_reset:
             self.hard_reset()
+        
+        return require_hard_reset
 
 
 if __name__ == "__main__":
