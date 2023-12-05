@@ -8,7 +8,7 @@ from typing import Callable, Tuple
 from time import sleep, monotonic
 from gymnasium import spaces
 from ..state import FootsiesState
-from ..moves import FootsiesMove, footsies_move_id_to_index, footsies_move_index_to_move
+from ..moves import FootsiesMove, footsies_move_id_to_index
 from .exceptions import FootsiesGameClosedError
 
 # TODO: move training agent input reading (through socket comms) to Update() instead of FixedUpdate()
@@ -16,6 +16,7 @@ from .exceptions import FootsiesGameClosedError
 # TODO: actually correct socket receive
 # TODO: investigate error of multiple state messages being sent at once even on synced environment
 # TODO: never block the game on socket communication even on synced environment
+# TODO: outside environment truncations are very costly, they require performing a hard_reset(). It should be optimized (allow passing commands through actions?)
 
 MAX_STATE_MESSAGE_BYTES = 4096
 
@@ -153,6 +154,10 @@ class FootsiesEnv(gym.Env):
         # Keep track of the total reward during this episode
         # Only used when dense rewards are enabled
         self._cummulative_episode_reward = 0.0
+
+        # Keep track of whether the current episode is finished
+        # Necessary when calling reset() when it isn't finished, which will require a hard reset
+        self.has_terminated = True
 
     def _instantiate_game(self):
         """
@@ -330,6 +335,9 @@ class FootsiesEnv(gym.Env):
         return reward
 
     def reset(self, *, seed: int = None, options: dict = None) -> "tuple[dict, dict]":
+        if not self.has_terminated:
+            self._hard_reset()
+        
         self.delayed_frame_queue.clear()
         self._cummulative_episode_reward = 0.0
 
@@ -341,6 +349,10 @@ class FootsiesEnv(gym.Env):
         while len(self.delayed_frame_queue) < self.delayed_frame_queue.maxlen - 1:
             # Give the agent the same initial state but repeated (`frame_delay` - 1) times
             self.delayed_frame_queue.append(first_state)
+
+        # The episode can't terminate right in the beginning
+        # This will also allow reset() to be called right after reset()
+        self.has_terminated = False
 
         obs = self._extract_obs(first_state)
         # Create a copy of this observation (make sure it's not edited because 'obs' was changed afterwards, which may happen with wrappers)
@@ -392,6 +404,9 @@ class FootsiesEnv(gym.Env):
             else self._get_sparse_reward(previous_state, most_recent_state, terminated)
         )
 
+        # Enable reset() without needing hard_reset() if episode terminated normally on this step
+        self.has_terminated = terminated
+
         # Create a copy of this observation, as is done in reset()
         self._last_passed_observation = obs.copy()
 
@@ -405,7 +420,7 @@ class FootsiesEnv(gym.Env):
         if self._game_instance is not None:
             self._game_instance.kill()  # just making sure the game is closed
 
-    def hard_reset(self):
+    def _hard_reset(self):
         """Reset the entire environment, closing the socket connections and the game. The next `reset()` call will recreate these resources"""
         self.close()
 
@@ -439,8 +454,9 @@ class FootsiesEnv(gym.Env):
         # This internal variable needs to be updated before hard-resetting
         self.opponent = opponent
 
+        # TODO: ideally this shouldn't be required, makes changing between the in-game and custom opponent costly
         if require_hard_reset:
-            self.hard_reset()
+            self._hard_reset()
         
         return require_hard_reset
 
