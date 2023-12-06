@@ -2,6 +2,7 @@ from collections import deque
 import socket
 import json
 import subprocess
+import struct
 import gymnasium as gym
 from os import path
 from typing import Callable, Tuple
@@ -13,16 +14,16 @@ from .exceptions import FootsiesGameClosedError
 
 # TODO: move training agent input reading (through socket comms) to Update() instead of FixedUpdate()
 # TODO: dynamically change the game's timeScale value depending on the estimated framerate
-# TODO: actually correct socket receive
 # TODO: investigate error of multiple state messages being sent at once even on synced environment
 # TODO: never block the game on socket communication even on synced environment
 # TODO: outside environment truncations are very costly, they require performing a hard_reset(). It should be optimized (allow passing commands through actions?)
 
-MAX_STATE_MESSAGE_BYTES = 4096
-
 
 class FootsiesEnv(gym.Env):
     metadata = {"render_modes": "human", "render_fps": 60}
+    
+    STATE_MESSAGE_SIZE_BYTES = 4
+    COMM_TIMEOUT = 3.0
 
     def __init__(
         self,
@@ -106,7 +107,7 @@ class FootsiesEnv(gym.Env):
         self.render_mode = render_mode
 
         self.comm = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.comm.setblocking(True)
+        self.comm.settimeout(self.COMM_TIMEOUT)
         self._connected = False
         self._game_instance = None
 
@@ -116,7 +117,7 @@ class FootsiesEnv(gym.Env):
             else None
         )
         if self.opponent_comm is not None:
-            self.opponent_comm.setblocking(True)
+            self.opponent_comm.settimeout(self.COMM_TIMEOUT)
         self._opponent_connected = False
 
         # Don't consider the end-of-round moves
@@ -239,17 +240,26 @@ class FootsiesEnv(gym.Env):
                     )  # avoid constantly pestering the game for a connection
                     continue
 
-    def _receive_and_update_state(self) -> FootsiesState:
-        """Receive the environment state from the FOOTSIES instance"""
+    def _game_recv(self, size: int) -> bytes:
+        """Receive a message of the given size from the FOOTSIES instance. Raises `FootsiesGameClosedError` if a problem occurred"""
         try:
-            state_json = self.comm.recv(MAX_STATE_MESSAGE_BYTES).decode("utf-8")
-        except OSError:
-            raise FootsiesGameClosedError
+            res = self.comm.recv(size)
+        except TimeoutError:
+            raise FootsiesGameClosedError("game took too long to respond, will assume it's closed")
 
         # The communication is assumed to work correctly, so if a message wasn't received then the game must have closed
-        if len(state_json) == 0:
-            raise FootsiesGameClosedError
+        if len(res) == 0:
+            raise FootsiesGameClosedError("game has closed")
 
+        return res
+
+    def _receive_and_update_state(self) -> FootsiesState:
+        """Receive the environment state from the FOOTSIES instance"""
+        state_json_size_bytes = self._game_recv(self.STATE_MESSAGE_SIZE_BYTES)
+        state_json_size = struct.unpack("!I", state_json_size_bytes)[0]
+
+        state_json = self._game_recv(state_json_size).decode("utf-8")
+        
         self._current_state = FootsiesState(**json.loads(state_json))
 
         return self._current_state
@@ -425,7 +435,7 @@ class FootsiesEnv(gym.Env):
         self.close()
 
         self.comm = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.comm.setblocking(True)
+        self.comm.settimeout(self.COMM_TIMEOUT)
 
         self.opponent_comm = (
             socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -433,7 +443,7 @@ class FootsiesEnv(gym.Env):
             else None
         )
         if self.opponent_comm is not None:
-            self.opponent_comm.setblocking(True)
+            self.opponent_comm.settimeout(self.COMM_TIMEOUT)
 
         self._connected = False
         self._opponent_connected = False
@@ -465,9 +475,8 @@ if __name__ == "__main__":
     env = FootsiesEnv(
         game_path="Build/FOOTSIES.exe",
         render_mode="human",
-        by_example=True,
         vs_player=True,
-        fast_forward=False,
+        fast_forward=True,
         log_file="out.log",
         log_file_overwrite=True,
         frame_delay=0,
@@ -504,9 +513,9 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("Training manually interrupted by the keyboard")
 
-    except FootsiesGameClosedError:
+    except FootsiesGameClosedError as err:
         print(
-            "Training interrupted due to the game connection being lost (did the game close?)"
+            f"Training interrupted due to the game connection being lost: {err}"
         )
 
     finally:

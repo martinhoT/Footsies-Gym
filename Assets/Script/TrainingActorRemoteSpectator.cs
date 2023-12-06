@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
+using System;
 
 namespace Footsies
 {
@@ -84,11 +85,22 @@ namespace Footsies
             actor.UpdateCurrentState(state, battleOver);
 
             string stateJson = JsonUtility.ToJson(state);
+            byte[] stateBytes = Encoding.UTF8.GetBytes(stateJson);
+
+            // Get size of the message and add it as a suffix
+            byte[] sizeSuffix = BitConverter.GetBytes(stateBytes.Length);
+            if (BitConverter.IsLittleEndian)
+                Array.Reverse(sizeSuffix);
+
+            byte[] message = new byte[sizeSuffix.Length + stateBytes.Length];
+            sizeSuffix.CopyTo(message, 0);
+            stateBytes.CopyTo(message, sizeSuffix.Length);
+
             Debug.Log("Sending the game's current state...");
             if (synced)
-                trainingSocket.Send(Encoding.UTF8.GetBytes(stateJson), SocketFlags.None);
+                trainingSocket.Send(message, SocketFlags.None);
             else
-                mostRecentAsyncStateRequest = trainingSocket.SendAsync(Encoding.UTF8.GetBytes(stateJson), SocketFlags.None);
+                mostRecentAsyncStateRequest = trainingSocket.SendAsync(message, SocketFlags.None);
             Debug.Log("Current state received by the spectator! (frame: " + state.globalFrame + ")");
 
             mostRecentAsyncStateRequest = null;

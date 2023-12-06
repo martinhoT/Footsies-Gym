@@ -71,11 +71,22 @@ namespace Footsies
             if (!noState && inputReady)
             {
                 string stateJson = JsonUtility.ToJson(state);
+                byte[] stateBytes = Encoding.UTF8.GetBytes(stateJson);
+
+                // Get size of the message and add it as a suffix
+                byte[] sizeSuffix = BitConverter.GetBytes(stateBytes.Length);
+                if (BitConverter.IsLittleEndian)
+                    Array.Reverse(sizeSuffix);
+
+                byte[] message = new byte[sizeSuffix.Length + stateBytes.Length];
+                sizeSuffix.CopyTo(message, 0);
+                stateBytes.CopyTo(message, sizeSuffix.Length);
+
                 Debug.Log("Sending the game's current state...");
                 if (synced)
-                    trainingSocket.Send(Encoding.UTF8.GetBytes(stateJson), SocketFlags.None);
+                    trainingSocket.Send(message, SocketFlags.None);
                 else
-                    trainingSocket.SendAsync(Encoding.UTF8.GetBytes(stateJson), SocketFlags.None);
+                    trainingSocket.SendAsync(message, SocketFlags.None);
                 Debug.Log("Current state received by the agent! (frame: " + state.globalFrame + ")");
             }
 
