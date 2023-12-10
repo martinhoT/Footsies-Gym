@@ -222,7 +222,7 @@ class FootsiesEnv(gym.Env):
                 self.comm.connect((self.game_address, self.game_port))
                 self._connected = True
 
-            except ConnectionRefusedError:
+            except (ConnectionRefusedError, ConnectionAbortedError):
                 sleep(
                     retry_delay
                 )  # avoid constantly pestering the game for a connection
@@ -234,7 +234,7 @@ class FootsiesEnv(gym.Env):
                     self.opponent_comm.connect((self.game_address, self.opponent_port))
                     self._opponent_connected = True
 
-                except ConnectionRefusedError:
+                except (ConnectionRefusedError, ConnectionAbortedError):
                     sleep(
                         retry_delay
                     )  # avoid constantly pestering the game for a connection
@@ -473,7 +473,7 @@ class FootsiesEnv(gym.Env):
 
 if __name__ == "__main__":
     env = FootsiesEnv(
-        game_path="Build/FOOTSIES.exe",
+        game_path="Build/FOOTSIES.x86_64",
         render_mode="human",
         vs_player=True,
         fast_forward=True,
