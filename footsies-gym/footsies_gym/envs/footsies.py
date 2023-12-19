@@ -14,8 +14,7 @@ from .exceptions import FootsiesGameClosedError
 
 # TODO: move training agent input reading (through socket comms) to Update() instead of FixedUpdate()
 # TODO: dynamically change the game's timeScale value depending on the estimated framerate
-# TODO: investigate error of multiple state messages being sent at once even on synced environment
-# TODO: never block the game on socket communication even on synced environment
+# TODO: never block the game on socket communication even on synced environment (include 3 different sync modes)
 # TODO: outside environment truncations are very costly, they require performing a hard_reset(). It should be optimized (allow passing commands through actions?)
 
 
@@ -27,7 +26,7 @@ class FootsiesEnv(gym.Env):
 
     def __init__(
         self,
-        frame_delay: int = 20,
+        frame_delay: int = 0,
         render_mode: str = None,
         game_path: str = "./Build/FOOTSIES",
         game_address: str = "localhost",
@@ -38,7 +37,7 @@ class FootsiesEnv(gym.Env):
         opponent: Callable[[dict], Tuple[bool, bool, bool]] = None,
         opponent_port: int = 11001,
         vs_player: bool = False,
-        dense_reward: bool = False,
+        dense_reward: bool = True,
         log_file: str = None,
         log_file_overwrite: bool = False,
     ):
@@ -317,6 +316,8 @@ class FootsiesEnv(gym.Env):
             "frame": state.global_frame,
             "p1_action": state.p1_most_recent_action,
             "p2_action": state.p2_most_recent_action,
+            "p1_move": footsies_move_id_to_index[state.p1_move],
+            "p2_move": footsies_move_id_to_index[state.p2_move],
         }
 
     def _get_sparse_reward(
