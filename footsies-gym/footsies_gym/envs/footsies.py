@@ -59,8 +59,8 @@ class FootsiesEnv(gym.Env):
             whether to run the game at a much faster rate than normal
         sync_mode: str
             one of "async", "synced_non_blocking" or "synced_blocking":
-            - "async": process the game without making sure the agents have provided inputs. Doesn't make much sense to have `fast_forward` enabled as well
-            - "synced_non_blocking": at every time step, the game will wait for all agents' inputs before proceeding. Communications are non-blocking, but may slow down game interaction speed to half
+            - "async": process the game without making sure the agents have provided inputs. Doesn't make much sense to have `fast_forward` enabled as well. Due to non-blocking communications, input may only be received every other frame, slowing down game interaction speed to half
+            - "synced_non_blocking": at every time step, the game will wait for all agents' inputs before proceeding. Communications are non-blocking, and as such may have the same problem as above
             - "synced_blocking": similar to above, but communications are blocking. If using human `render_mode`, the game may have frozen rendering
 
         by_example: bool
@@ -80,6 +80,11 @@ class FootsiesEnv(gym.Env):
 
         WARNING: if the environment has an unexpected error or closes incorrectly, it's possible the game process will still be running in the background. It should be closed manually in that case
         """
+        valid_sync_modes = {"async", "synced_non_blocking", "synced_blocking"}
+        if sync_mode not in valid_sync_modes:
+            raise ValueError(
+                f"sync mode '{sync_mode}' is invalid, must be one of {valid_sync_modes}"
+            )
         if opponent is not None and vs_player:
             raise ValueError(
                 "custom opponent and human opponent can't be specified together"
@@ -481,6 +486,7 @@ if __name__ == "__main__":
     env = FootsiesEnv(
         game_path="Build/FOOTSIES.x86_64",
         render_mode="human",
+        sync_mode="synced_non_blocking",
         vs_player=True,
         fast_forward=True,
         log_file="out.log",
@@ -512,6 +518,7 @@ if __name__ == "__main__":
                     f"Episode {episode_counter:>3} | {0 if seconds == 0 else frames / seconds:>3.2f} fps",
                     end="\r",
                 )
+                input()
                 # action_to_string = lambda t: " ".join(("O" if a else " ") for a in t)
                 # print(f"P1: {action_to_string(info['p1_action']):} | P2: {action_to_string(info['p2_action'])}")
             episode_counter += 1

@@ -38,7 +38,7 @@ namespace Footsies
             string passedArguments = "";
             // Default values
             bool argIsTrainingEnv = false;
-            bool argTrainingSyncMode = 0; // 0: async | 1: sync non-blocking | 2: sync blocking
+            int argTrainingSyncMode = 0; // 0: async | 1: sync non-blocking | 2: sync blocking
             bool argP1Bot = false;
             bool argP1Player = false;
             bool argP1Spectator = false;
