@@ -37,7 +37,7 @@ class FootsiesStatistics(gym.Wrapper):
                 FootsiesMove.B_ATTACK,
                 FootsiesMove.N_ATTACK,
             }:
-                self._special_moves_from_neutral_per_episode += 1
+                self._special_moves_from_neutral_per_episode_counter += 1
         
         self._prev_p1_move = p1_move
 

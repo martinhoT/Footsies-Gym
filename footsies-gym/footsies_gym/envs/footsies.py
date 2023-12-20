@@ -252,7 +252,9 @@ class FootsiesEnv(gym.Env):
     def _game_recv(self, size: int) -> bytes:
         """Receive a message of the given size from the FOOTSIES instance. Raises `FootsiesGameClosedError` if a problem occurred"""
         try:
-            res = self.comm.recv(size)
+            res = bytes()
+            while len(res) < size:
+                res += self.comm.recv(size - len(res))
         except TimeoutError:
             raise FootsiesGameClosedError("game took too long to respond, will assume it's closed")
 
@@ -268,7 +270,7 @@ class FootsiesEnv(gym.Env):
         state_json_size = struct.unpack("!I", state_json_size_bytes)[0]
 
         state_json = self._game_recv(state_json_size).decode("utf-8")
-        
+
         self._current_state = FootsiesState(**json.loads(state_json))
 
         return self._current_state
