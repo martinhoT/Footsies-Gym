@@ -38,7 +38,7 @@ namespace Footsies
             string passedArguments = "";
             // Default values
             bool argIsTrainingEnv = false;
-            bool argIsTrainingEnvSynced = false;
+            bool argTrainingSyncMode = 0; // 0: async | 1: sync non-blocking | 2: sync blocking
             bool argP1Bot = false;
             bool argP1Player = false;
             bool argP1Spectator = false;
@@ -66,11 +66,15 @@ namespace Footsies
                     case "--fast-forward":
                         argFastForward = true;
                         break;
-
-                    case "--synced":
-                        argIsTrainingEnvSynced = true;
-                        break;
                     
+                    case "--synced-non-blocking":
+                        argTrainingSyncMode = 1;
+                        break;
+
+                    case "--synced-blocking":
+                        argTrainingSyncMode = 2;
+                        break;
+
                     case "--p1-bot":
                         argP1Bot = true;
                         break;
@@ -129,7 +133,13 @@ namespace Footsies
             Debug.Log("Passed arguments: " + passedArguments + "\n"
                 + "   Run as training environment? " + argIsTrainingEnv + "\n"
                 + "   Fast forward training? " + argFastForward + "\n"
-                + "   Synced? " + argIsTrainingEnvSynced + "\n"
+                + "   Sync mode? " + (
+                    (argTrainingSyncMode == 2)
+                        ? "synced blocking"
+                        : (argTrainingSyncMode == 1)
+                            ? "synced non-blocking"
+                            : "async"
+                ) + "\n"
                 + "   Mute? " + shouldMute + "\n"
                 + "   P1 Bot? " + argP1Bot + "\n"
                 + "   P1 Player? " + argP1Player + "\n"
@@ -159,19 +169,19 @@ namespace Footsies
 
             TrainingActor actorP1 = argP1Bot ? botP1
                          : (argP1Player ? new TrainingPlayerActor(true)
-                                        : new TrainingRemoteActor(argP1TrainingAddress, argP1TrainingPort, argIsTrainingEnvSynced, argP1NoState));
+                                        : new TrainingRemoteActor(argP1TrainingAddress, argP1TrainingPort, argTrainingSyncMode == 2, argP1NoState));
 
             TrainingActor actorP2 = argP2Bot ? botP2
                          : (argP2Player ? new TrainingPlayerActor(false)
-                                        : new TrainingRemoteActor(argP2TrainingAddress, argP2TrainingPort, argIsTrainingEnvSynced, argP2NoState));
+                                        : new TrainingRemoteActor(argP2TrainingAddress, argP2TrainingPort, argTrainingSyncMode == 2, argP2NoState));
 
             // WARNING: because each player only has an address-port pair, it doesn't make sense to create a spectator of a RemoteActor
             if (argP1Spectator)
-                actorP1 = new TrainingActorRemoteSpectator(argP1TrainingAddress, argP1TrainingPort, argIsTrainingEnvSynced, actorP1);
+                actorP1 = new TrainingActorRemoteSpectator(argP1TrainingAddress, argP1TrainingPort, argTrainingSyncMode == 2, actorP1);
             if (argP2Spectator)
-                actorP2 = new TrainingActorRemoteSpectator(argP2TrainingAddress, argP2TrainingPort, argIsTrainingEnvSynced, actorP2);
+                actorP2 = new TrainingActorRemoteSpectator(argP2TrainingAddress, argP2TrainingPort, argTrainingSyncMode == 2, actorP2);
 
-            trainingManager = new TrainingManager(argIsTrainingEnv, argIsTrainingEnvSynced, actorP1, actorP2);
+            trainingManager = new TrainingManager(argIsTrainingEnv, argTrainingSyncMode > 0, actorP1, actorP2);
         }
 
         private void Start()

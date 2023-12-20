@@ -10,7 +10,7 @@ namespace Footsies
     {
         public string address { get; private set; }
         public int port { get; private set; }
-        public bool synced { get; private set; }
+        public bool synced_comms { get; private set; }
         public bool noState { get; private set; }
 
         // Whether we already requested for the agent's input
@@ -23,11 +23,11 @@ namespace Footsies
         private Socket trainingListener;
         private Socket trainingSocket;
 
-        public TrainingRemoteActor(string address, int port, bool synced, bool noState)
+        public TrainingRemoteActor(string address, int port, bool synced_comms, bool noState)
         {
             this.address = address;
             this.port = port;
-            this.synced = synced;
+            this.synced_comms = synced_comms;
             this.noState = noState;
         }
 
@@ -83,7 +83,7 @@ namespace Footsies
                 stateBytes.CopyTo(message, sizeSuffix.Length);
 
                 Debug.Log("Sending the game's current state...");
-                if (synced)
+                if (synced_comms)
                     trainingSocket.Send(message, SocketFlags.None);
                 else
                     trainingSocket.SendAsync(message, SocketFlags.None);
@@ -108,7 +108,7 @@ namespace Footsies
             if (!inputReady && !inputRequested)
             {
                 inputRequested = true;
-                if (synced)
+                if (synced_comms)
                     ReceiveTrainingInput();
                 else
                     ReceiveTrainingInputAsync();
@@ -120,7 +120,7 @@ namespace Footsies
 
         public bool Ready()
         {
-            return !synced || inputReady;
+            return inputReady;
         }
 
         private void ReceiveTrainingInput()

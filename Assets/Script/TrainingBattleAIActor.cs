@@ -34,7 +34,6 @@ namespace Footsies
             input = battleAI.getNextAIInput();
         }
 
-        // don't care didn't ask
         public void UpdateCurrentState(EnvironmentState state, bool battleOver) {}
     }
 }

@@ -95,7 +95,7 @@ namespace Footsies
 
         public bool Ready()
         {
-            return !isTraining || (actorP1.Ready() && actorP2.Ready());
+            return !isTraining || !isTrainingSynced || (actorP1.Ready() && actorP2.Ready());
         }
     }
 }

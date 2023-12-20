@@ -14,7 +14,7 @@ namespace Footsies
     {
         public string address { get; private set; }
         public int port { get; private set; }
-        public bool synced { get; private set; }
+        public bool synced_comms { get; private set; }
 
         private Task<int> mostRecentAsyncStateRequest = null;
 
@@ -23,18 +23,18 @@ namespace Footsies
 
         private TrainingActor actor;
 
-        public TrainingActorRemoteSpectator(string address, int port, bool synced)
+        public TrainingActorRemoteSpectator(string address, int port, bool synced_comms)
         {
             this.address = address;
             this.port = port;
-            this.synced = synced;
+            this.synced_comms = synced_comms;
         }
 
-        public TrainingActorRemoteSpectator(string address, int port, bool synced, TrainingActor actor)
+        public TrainingActorRemoteSpectator(string address, int port, bool synced_comms, TrainingActor actor)
         {
             this.address = address;
             this.port = port;
-            this.synced = synced;
+            this.synced_comms = synced_comms;
             this.actor = actor;
         }
 
@@ -97,7 +97,7 @@ namespace Footsies
             stateBytes.CopyTo(message, sizeSuffix.Length);
 
             Debug.Log("Sending the game's current state...");
-            if (synced)
+            if (synced_comms)
                 trainingSocket.Send(message, SocketFlags.None);
             else
                 mostRecentAsyncStateRequest = trainingSocket.SendAsync(message, SocketFlags.None);
@@ -118,7 +118,7 @@ namespace Footsies
 
         public bool Ready()
         {
-            return actor.Ready() && (!synced || mostRecentAsyncStateRequest == null || mostRecentAsyncStateRequest.IsCompleted);
+            return actor.Ready() && (mostRecentAsyncStateRequest == null || mostRecentAsyncStateRequest.IsCompleted);
         }
     }
 }

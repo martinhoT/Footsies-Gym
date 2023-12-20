@@ -14,8 +14,6 @@ from .exceptions import FootsiesGameClosedError
 
 # TODO: move training agent input reading (through socket comms) to Update() instead of FixedUpdate()
 # TODO: dynamically change the game's timeScale value depending on the estimated framerate
-# TODO: investigate error of multiple state messages being sent at once even on synced environment
-# TODO: never block the game on socket communication even on synced environment
 # TODO: outside environment truncations are very costly, they require performing a hard_reset(). It should be optimized (allow passing commands through actions?)
 
 
@@ -33,7 +31,7 @@ class FootsiesEnv(gym.Env):
         game_address: str = "localhost",
         game_port: int = 11000,
         fast_forward: bool = True,
-        synced: bool = True,
+        sync_mode: str = "synced_blocking",
         by_example: bool = False,
         opponent: Callable[[dict], Tuple[bool, bool, bool]] = None,
         opponent_port: int = 11001,
@@ -59,8 +57,12 @@ class FootsiesEnv(gym.Env):
             port of the FOOTSIES instance
         fast_forward: bool
             whether to run the game at a much faster rate than normal
-        synced: bool
-            whether to wait for the agent's input before proceeding in the environment. It doesn't make much sense to let both `fast_forward` to be `True` and `synced` be `False`
+        sync_mode: str
+            one of "async", "synced_non_blocking" or "synced_blocking":
+            - "async": process the game without making sure the agents have provided inputs. Doesn't make much sense to have `fast_forward` enabled as well
+            - "synced_non_blocking": at every time step, the game will wait for all agents' inputs before proceeding. Communications are non-blocking, but may slow down game interaction speed to half
+            - "synced_blocking": similar to above, but communications are blocking. If using human `render_mode`, the game may have frozen rendering
+
         by_example: bool
             whether to simply observe another autonomous player play the game. Actions passed in `step()` are ignored
         opponent: Callable[[dict], Tuple[bool, bool, bool]]
@@ -87,7 +89,7 @@ class FootsiesEnv(gym.Env):
         self.game_address = game_address
         self.game_port = game_port
         self.fast_forward = fast_forward
-        self.synced = synced
+        self.sync_mode = sync_mode
         self.by_example = by_example
         self.opponent = opponent
         self.opponent_port = opponent_port
@@ -179,8 +181,10 @@ class FootsiesEnv(gym.Env):
                 args.extend(["-batchmode", "-nographics"])
             if self.fast_forward:
                 args.append("--fast-forward")
-            if self.synced:
-                args.append("--synced")
+            if self.sync_mode == "synced_non_blocking":
+                args.append("--synced-non-blocking")
+            elif self.sync_mode == "synced_blocking":
+                args.append("--synced-blocking")
             if self.by_example:
                 args.append("--p1-bot")
                 args.append("--p1-spectator")
