@@ -504,6 +504,7 @@ if __name__ == "__main__":
     fps_counter_decay = 0.01 ** (1 / 1000)
 
     episode_counter = 0
+    wins_counter = 0
 
     try:
         while True:
@@ -516,11 +517,11 @@ if __name__ == "__main__":
 
                 frames = (frames * fps_counter_decay) + 1
                 seconds = (seconds * fps_counter_decay) + monotonic() - time_current
+                wins_counter += 1 if terminated and reward > 0 else 0
                 print(
-                    f"Episode {episode_counter:>3} | {0 if seconds == 0 else frames / seconds:>3.2f} fps",
+                    f"Episode {episode_counter:>3} | {0 if seconds == 0 else frames / seconds:>7.2f} fps | P1 {wins_counter / (episode_counter) if episode_counter > 0 else 0:>7.2%} win rate",
                     end="\r",
                 )
-                input()
                 # action_to_string = lambda t: " ".join(("O" if a else " ") for a in t)
                 # print(f"P1: {action_to_string(info['p1_action']):} | P2: {action_to_string(info['p2_action'])}")
             episode_counter += 1

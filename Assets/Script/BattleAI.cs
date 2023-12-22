@@ -18,6 +18,7 @@ namespace Footsies
         }
 
         private BattleCore battleCore;
+        private Fighter otherFighter;
 
         private Queue<int> moveQueue = new Queue<int>();
         private Queue<int> attackQueue = new Queue<int>();
@@ -30,7 +31,7 @@ namespace Footsies
         public BattleAI(BattleCore core, bool player1)
         {
             battleCore = core;
-            otherFighter = player1 ? battleCore.fighter1 : battleCore.fighter2;
+            otherFighter = player1 ? battleCore.fighter2 : battleCore.fighter1;
         }
 
         public int getNextAIInput()

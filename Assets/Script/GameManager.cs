@@ -157,9 +157,9 @@ namespace Footsies
 
             if (argIsTrainingEnv && argFastForward)
             {
-                // Make the game run 20x faster for more efficient training
-                Time.timeScale = 20;
-                Application.targetFrameRate = 1000;
+                // Make the game run 100x faster for more efficient training
+                Time.timeScale = 100;
+                Application.targetFrameRate = 5000;
             }
 
             if (argP1Bot)
