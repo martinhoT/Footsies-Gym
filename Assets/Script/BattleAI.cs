@@ -27,9 +27,10 @@ namespace Footsies
         public static readonly uint maxFightStateRecord = 10;
         private int fightStateReadIndex = 5;
 
-        public BattleAI(BattleCore core)
+        public BattleAI(BattleCore core, bool player1)
         {
             battleCore = core;
+            otherFighter = player1 ? battleCore.fighter1 : battleCore.fighter2;
         }
 
         public int getNextAIInput()
@@ -339,15 +340,15 @@ namespace Footsies
         {
             var currentFightState = new FightState();
             currentFightState.distanceX = GetDistanceX();
-            currentFightState.isOpponentDamage = battleCore.fighter1.currentActionID == (int)CommonActionID.DAMAGE;
-            currentFightState.isOpponentGuardBreak= battleCore.fighter1.currentActionID == (int)CommonActionID.GUARD_BREAK;
-            currentFightState.isOpponentBlocking = (battleCore.fighter1.currentActionID == (int)CommonActionID.GUARD_CROUCH
-                                                    || battleCore.fighter1.currentActionID == (int)CommonActionID.GUARD_STAND
-                                                    || battleCore.fighter1.currentActionID == (int)CommonActionID.GUARD_M);
-            currentFightState.isOpponentNormalAttack = (battleCore.fighter1.currentActionID == (int)CommonActionID.N_ATTACK
-                                                    || battleCore.fighter1.currentActionID == (int)CommonActionID.B_ATTACK);
-            currentFightState.isOpponentSpecialAttack = (battleCore.fighter1.currentActionID == (int)CommonActionID.N_SPECIAL
-                                                    || battleCore.fighter1.currentActionID == (int)CommonActionID.B_SPECIAL);
+            currentFightState.isOpponentDamage = otherFighter.currentActionID == (int)CommonActionID.DAMAGE;
+            currentFightState.isOpponentGuardBreak= otherFighter.currentActionID == (int)CommonActionID.GUARD_BREAK;
+            currentFightState.isOpponentBlocking = (otherFighter.currentActionID == (int)CommonActionID.GUARD_CROUCH
+                                                    || otherFighter.currentActionID == (int)CommonActionID.GUARD_STAND
+                                                    || otherFighter.currentActionID == (int)CommonActionID.GUARD_M);
+            currentFightState.isOpponentNormalAttack = (otherFighter.currentActionID == (int)CommonActionID.N_ATTACK
+                                                    || otherFighter.currentActionID == (int)CommonActionID.B_ATTACK);
+            currentFightState.isOpponentSpecialAttack = (otherFighter.currentActionID == (int)CommonActionID.N_SPECIAL
+                                                    || otherFighter.currentActionID == (int)CommonActionID.B_SPECIAL);
 
             for (int i = 1; i < fightStates.Length; i++)
             {

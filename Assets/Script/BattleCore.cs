@@ -108,8 +108,8 @@ namespace Footsies
             if (trainingManager.isTraining)
             {
                 // Awkward case, BattleCore is the only one who can setup the TrainingBattleAIActors, since only it can properly create BattleAIs
-                GameManager.Instance.botP1?.SetAI(new BattleAI(this));
-                GameManager.Instance.botP2?.SetAI(new BattleAI(this));
+                GameManager.Instance.botP1?.SetAI(new BattleAI(this, true));
+                GameManager.Instance.botP2?.SetAI(new BattleAI(this, false));
 
                 trainingManager.Setup();
 
@@ -224,7 +224,7 @@ namespace Footsies
                     roundUIAnimator.SetTrigger("RoundStart");
 
                     if (GameManager.Instance.isVsCPU)
-                        battleAI = new BattleAI(this);
+                        battleAI = new BattleAI(this, false);
 
                     break;
                 case RoundStateType.Fight:
