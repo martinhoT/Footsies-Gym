@@ -18,7 +18,8 @@ namespace Footsies
         }
 
         private BattleCore battleCore;
-        private Fighter otherFighter;
+        private Fighter opponent;
+        private bool isPlayer1;
 
         private Queue<int> moveQueue = new Queue<int>();
         private Queue<int> attackQueue = new Queue<int>();
@@ -31,7 +32,8 @@ namespace Footsies
         public BattleAI(BattleCore core, bool player1)
         {
             battleCore = core;
-            otherFighter = player1 ? battleCore.fighter2 : battleCore.fighter1;
+            isPlayer1 = player1;
+            opponent = this.isPlayer1 ? battleCore.fighter2 : battleCore.fighter1;
         }
 
         public int getNextAIInput()
@@ -341,15 +343,15 @@ namespace Footsies
         {
             var currentFightState = new FightState();
             currentFightState.distanceX = GetDistanceX();
-            currentFightState.isOpponentDamage = otherFighter.currentActionID == (int)CommonActionID.DAMAGE;
-            currentFightState.isOpponentGuardBreak= otherFighter.currentActionID == (int)CommonActionID.GUARD_BREAK;
-            currentFightState.isOpponentBlocking = (otherFighter.currentActionID == (int)CommonActionID.GUARD_CROUCH
-                                                    || otherFighter.currentActionID == (int)CommonActionID.GUARD_STAND
-                                                    || otherFighter.currentActionID == (int)CommonActionID.GUARD_M);
-            currentFightState.isOpponentNormalAttack = (otherFighter.currentActionID == (int)CommonActionID.N_ATTACK
-                                                    || otherFighter.currentActionID == (int)CommonActionID.B_ATTACK);
-            currentFightState.isOpponentSpecialAttack = (otherFighter.currentActionID == (int)CommonActionID.N_SPECIAL
-                                                    || otherFighter.currentActionID == (int)CommonActionID.B_SPECIAL);
+            currentFightState.isOpponentDamage = opponent.currentActionID == (int)CommonActionID.DAMAGE;
+            currentFightState.isOpponentGuardBreak= opponent.currentActionID == (int)CommonActionID.GUARD_BREAK;
+            currentFightState.isOpponentBlocking = (opponent.currentActionID == (int)CommonActionID.GUARD_CROUCH
+                                                    || opponent.currentActionID == (int)CommonActionID.GUARD_STAND
+                                                    || opponent.currentActionID == (int)CommonActionID.GUARD_M);
+            currentFightState.isOpponentNormalAttack = (opponent.currentActionID == (int)CommonActionID.N_ATTACK
+                                                    || opponent.currentActionID == (int)CommonActionID.B_ATTACK);
+            currentFightState.isOpponentSpecialAttack = (opponent.currentActionID == (int)CommonActionID.N_SPECIAL
+                                                    || opponent.currentActionID == (int)CommonActionID.B_SPECIAL);
 
             for (int i = 1; i < fightStates.Length; i++)
             {
@@ -375,12 +377,12 @@ namespace Footsies
 
         private int GetForwardInput()
         {
-            return (int)InputDefine.Left;
+            return (int) (this.isPlayer1 ? InputDefine.Right : InputDefine.Left);
         }
 
         private int GetBackwardInput()
         {
-            return (int)InputDefine.Right;
+            return (int) (this.isPlayer1 ? InputDefine.Left : InputDefine.Right);
         }
 
     }
