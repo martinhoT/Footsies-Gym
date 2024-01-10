@@ -10,7 +10,7 @@ namespace Footsies
     {
         public string address { get; private set; }
         public int port { get; private set; }
-        public bool synced_comms { get; private set; }
+        public bool syncedComms { get; private set; }
         public bool noState { get; private set; }
 
         // Whether we already requested for the agent's input
@@ -23,37 +23,37 @@ namespace Footsies
         private Socket trainingListener;
         private Socket trainingSocket;
 
-        public TrainingRemoteActor(string address, int port, bool synced_comms, bool noState)
+        public TrainingRemoteActor(string address, int port, bool syncedComms, bool noState)
         {
             this.address = address;
             this.port = port;
-            this.synced_comms = synced_comms;
+            this.syncedComms = syncedComms;
             this.noState = noState;
         }
 
         public void Setup()
         {
             // Setup Socket server to listen for the agent's actions
-            IPAddress localhostAddress = null;
+            IPAddress hostIPAddress = null;
             foreach (var hostAddress in Dns.GetHostAddresses(address))
             {
                 // Only accept IPv4 addresses
                 if (hostAddress.AddressFamily == AddressFamily.InterNetwork)
                 {
-                    localhostAddress = hostAddress;
+                    hostIPAddress = hostAddress;
                     break; // return the first one found
                 }
             }
-            if (localhostAddress == null)
+            if (hostIPAddress == null)
             {
-                Debug.Log("ERROR: could not find any suitable IPv4 address for 'localhost'! Quitting...");
+                Debug.Log("ERROR: could not find any suitable IPv4 address for '" + address + "'! Quitting...");
                 Application.Quit();
             }
-            IPEndPoint ipEndPoint = new IPEndPoint(localhostAddress, port);
+            IPEndPoint ipEndPoint = new(hostIPAddress, port);
             trainingListener = new Socket(ipEndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
             trainingListener.Bind(ipEndPoint);
             trainingListener.Listen(1); // maximum queue length of 1, there is only 1 agent
-            Debug.Log("Waiting for the agent to connect to address '" + localhostAddress.ToString() + "'...");
+            Debug.Log("Waiting for the agent to connect to address '" + hostIPAddress.ToString() + "'...");
             trainingSocket = trainingListener.Accept();
             Debug.Log("Agent connection received!");
             trainingListener.Close();
@@ -73,20 +73,11 @@ namespace Footsies
                 string stateJson = JsonUtility.ToJson(state);
                 byte[] stateBytes = Encoding.UTF8.GetBytes(stateJson);
 
-                // Get size of the message and add it as a suffix
-                byte[] sizeSuffix = BitConverter.GetBytes(stateBytes.Length);
-                if (BitConverter.IsLittleEndian)
-                    Array.Reverse(sizeSuffix);
-
-                byte[] message = new byte[sizeSuffix.Length + stateBytes.Length];
-                sizeSuffix.CopyTo(message, 0);
-                stateBytes.CopyTo(message, sizeSuffix.Length);
-
                 Debug.Log("Sending the game's current state...");
-                if (synced_comms)
-                    trainingSocket.Send(message, SocketFlags.None);
+                if (syncedComms)
+                    SocketHelper.SendWithSizeSuffix(trainingSocket, stateBytes);
                 else
-                    trainingSocket.SendAsync(message, SocketFlags.None);
+                    SocketHelper.SendWithSizeSuffixAsync(trainingSocket, stateBytes);
                 Debug.Log("Current state received by the agent! (frame: " + state.globalFrame + ")");
             }
 
@@ -108,7 +99,7 @@ namespace Footsies
             if (!inputReady && !inputRequested)
             {
                 inputRequested = true;
-                if (synced_comms)
+                if (syncedComms)
                     ReceiveTrainingInput();
                 else
                     ReceiveTrainingInputAsync();
@@ -126,7 +117,7 @@ namespace Footsies
         private void ReceiveTrainingInput()
         {
             byte[] actionMessageContent = {0, 0, 0};
-            ArraySegment<byte> actionMessage = new ArraySegment<byte>(actionMessageContent);
+            ArraySegment<byte> actionMessage = new(actionMessageContent);
 
             Debug.Log("Waiting for the agent's action...");
             int bytesReceived = trainingSocket.Receive(actionMessage, SocketFlags.None);
@@ -154,7 +145,7 @@ namespace Footsies
         private async void ReceiveTrainingInputAsync()
         {
             byte[] actionMessageContent = {0, 0, 0};
-            ArraySegment<byte> actionMessage = new ArraySegment<byte>(actionMessageContent);
+            ArraySegment<byte> actionMessage = new(actionMessageContent);
 
             Debug.Log("Waiting for the agent's action...");
             int bytesReceived = await trainingSocket.ReceiveAsync(actionMessage, SocketFlags.None);

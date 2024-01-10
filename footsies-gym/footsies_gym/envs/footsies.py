@@ -7,14 +7,15 @@ import gymnasium as gym
 from os import path
 from typing import Callable, Tuple
 from time import sleep, monotonic
+from enum import Enum
 from gymnasium import spaces
-from ..state import FootsiesState
+from ..state import FootsiesFighterState, FootsiesState, FootsiesBattleState
 from ..moves import FootsiesMove, footsies_move_id_to_index
 from .exceptions import FootsiesGameClosedError
 
 # TODO: move training agent input reading (through socket comms) to Update() instead of FixedUpdate()
 # TODO: dynamically change the game's timeScale value depending on the estimated framerate
-# TODO: outside environment truncations are very costly, they require performing a hard_reset(). It should be optimized (allow passing commands through actions?)
+# TODO: reset functionality (need to be able to stop previous player input requests from the game)
 
 
 class FootsiesEnv(gym.Env):
@@ -22,6 +23,12 @@ class FootsiesEnv(gym.Env):
     
     STATE_MESSAGE_SIZE_BYTES = 4
     COMM_TIMEOUT = 3.0
+
+    class RemoteControlCommand(Enum):
+        NONE = 0
+        RESET = 1
+        STATE_SAVE = 2
+        STATE_LOAD = 3
 
     def __init__(
         self,
@@ -32,6 +39,7 @@ class FootsiesEnv(gym.Env):
         game_port: int = 11000,
         fast_forward: bool = True,
         sync_mode: str = "synced_blocking",
+        remote_control_port: int = 11002,
         by_example: bool = False,
         opponent: Callable[[dict], Tuple[bool, bool, bool]] = None,
         opponent_port: int = 11001,
@@ -62,7 +70,9 @@ class FootsiesEnv(gym.Env):
             - "async": process the game without making sure the agents have provided inputs. Doesn't make much sense to have `fast_forward` enabled as well. Due to non-blocking communications, input may only be received every other frame, slowing down game interaction speed to half
             - "synced_non_blocking": at every time step, the game will wait for all agents' inputs before proceeding. Communications are non-blocking, and as such may have the same problem as above
             - "synced_blocking": similar to above, but communications are blocking. If using human `render_mode`, the game may have frozen rendering
-
+            
+        remote_control_port: int
+            the port to which the remote control socket will connect to
         by_example: bool
             whether to simply observe another autonomous player play the game. Actions passed in `step()` are ignored
         opponent: Callable[[dict], Tuple[bool, bool, bool]]
@@ -95,6 +105,7 @@ class FootsiesEnv(gym.Env):
         self.game_port = game_port
         self.fast_forward = fast_forward
         self.sync_mode = sync_mode
+        self.remote_control_port = remote_control_port
         self.by_example = by_example
         self.opponent = opponent
         self.opponent_port = opponent_port
@@ -115,6 +126,8 @@ class FootsiesEnv(gym.Env):
 
         self.comm = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.comm.settimeout(self.COMM_TIMEOUT)
+        self.remote_control_comm = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.remote_control_comm.settimeout(self.COMM_TIMEOUT)
         self._connected = False
         self._game_instance = None
 
@@ -181,18 +194,25 @@ class FootsiesEnv(gym.Env):
                 self.game_address,
                 "--p1-port",
                 str(self.game_port),
+                "--remote-control-address",
+                self.game_address,
+                "--remote-control-port",
+                str(self.remote_control_port),
             ]
             if self.render_mode is None:
                 args.extend(["-batchmode", "-nographics"])
             if self.fast_forward:
                 args.append("--fast-forward")
+            
             if self.sync_mode == "synced_non_blocking":
                 args.append("--synced-non-blocking")
             elif self.sync_mode == "synced_blocking":
                 args.append("--synced-blocking")
+
             if self.by_example:
                 args.append("--p1-bot")
                 args.append("--p1-spectator")
+            
             if self.vs_player:
                 args.append("--p2-player")
             elif self.opponent is None:
@@ -218,6 +238,19 @@ class FootsiesEnv(gym.Env):
                 args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
             )
 
+    def _socket_connect(self, sckt: socket.socket, address: tuple, retry_delay: float = 0.5):
+        connected = False
+        while not connected:
+            try:
+                sckt.connect(address)
+                connected = True
+
+            except (ConnectionRefusedError, ConnectionAbortedError):
+                sleep(
+                    retry_delay
+                )  # avoid constantly pestering the game for a connection
+                continue
+
     def _connect_to_game(self, retry_delay: float = 0.5):
         """
         Connect to the FOOTSIES instance specified by the environment's address and port.
@@ -226,35 +259,22 @@ class FootsiesEnv(gym.Env):
 
         If an opponent was supplied, then try establishing a connection for the opponent as well.
         """
-        while not self._connected:
-            try:
-                self.comm.connect((self.game_address, self.game_port))
-                self._connected = True
-
-            except (ConnectionRefusedError, ConnectionAbortedError):
-                sleep(
-                    retry_delay
-                )  # avoid constantly pestering the game for a connection
-                continue
+        if not self._connected:
+            self._socket_connect(self.comm, (self.game_address, self.game_port), retry_delay)
+            self._socket_connect(self.remote_control_comm, (self.game_address, self.remote_control_port), retry_delay)
+            self._connected = True
 
         if self.opponent is not None:
-            while not self._opponent_connected:
-                try:
-                    self.opponent_comm.connect((self.game_address, self.opponent_port))
-                    self._opponent_connected = True
+            if not self._opponent_connected:
+                self._socket_connect(self.opponent_comm, (self.game_address, self.opponent_port), retry_delay)
+                self._opponent_connected = True
 
-                except (ConnectionRefusedError, ConnectionAbortedError):
-                    sleep(
-                        retry_delay
-                    )  # avoid constantly pestering the game for a connection
-                    continue
-
-    def _game_recv(self, size: int) -> bytes:
+    def _game_recv_bytes(self, sckt: socket.socket, size: int) -> bytes:
         """Receive a message of the given size from the FOOTSIES instance. Raises `FootsiesGameClosedError` if a problem occurred"""
         try:
             res = bytes()
             while len(res) < size:
-                res += self.comm.recv(size - len(res))
+                res += sckt.recv(size - len(res))
         except TimeoutError:
             raise FootsiesGameClosedError("game took too long to respond, will assume it's closed")
 
@@ -264,12 +284,16 @@ class FootsiesEnv(gym.Env):
 
         return res
 
+    def _game_recv_message(self, sckt: socket.socket) -> str:
+        """Receive an UTF-8 message from the given socket"""
+        message_size_bytes = self._game_recv_bytes(sckt, self.STATE_MESSAGE_SIZE_BYTES)
+        message_size = struct.unpack("!I", message_size_bytes)[0]
+
+        return self._game_recv_bytes(sckt, message_size).decode("utf-8")
+
     def _receive_and_update_state(self) -> FootsiesState:
         """Receive the environment state from the FOOTSIES instance"""
-        state_json_size_bytes = self._game_recv(self.STATE_MESSAGE_SIZE_BYTES)
-        state_json_size = struct.unpack("!I", state_json_size_bytes)[0]
-
-        state_json = self._game_recv(state_json_size).decode("utf-8")
+        state_json = self._game_recv_message(self.comm)
 
         self._current_state = FootsiesState(**json.loads(state_json))
 
@@ -293,72 +317,102 @@ class FootsiesEnv(gym.Env):
         # Simplify the number of frames since the start of the move for moves that last indefinitely
         p1_move_frame_simple = (
             0
-            if state.p1_move
+            if state.p1Move
             in {
                 FootsiesMove.STAND.value.id,
                 FootsiesMove.FORWARD.value.id,
                 FootsiesMove.BACKWARD.value.id,
             }
-            else state.p1_move_frame
+            else state.p1MoveFrame
         )
         p2_move_frame_simple = (
             0
-            if state.p2_move
+            if state.p2Move
             in {
                 FootsiesMove.STAND.value.id,
                 FootsiesMove.FORWARD.value.id,
                 FootsiesMove.BACKWARD.value.id,
             }
-            else state.p2_move_frame
+            else state.p2MoveFrame
         )
 
         return {
-            "guard": (state.p1_guard, state.p2_guard),
+            "guard": (state.p1Guard, state.p2Guard),
             "move": (
-                footsies_move_id_to_index[state.p1_move],
-                footsies_move_id_to_index[state.p2_move],
+                footsies_move_id_to_index[state.p1Move],
+                footsies_move_id_to_index[state.p2Move],
             ),
             "move_frame": (p1_move_frame_simple, p2_move_frame_simple),
-            "position": (state.p1_position, state.p2_position),
+            "position": (state.p1Position, state.p2Position),
         }
 
     def _extract_info(self, state: FootsiesState) -> dict:
         """Get the current additional info from the environment state"""
         return {
-            "frame": state.global_frame,
-            "p1_action": state.p1_most_recent_action,
-            "p2_action": state.p2_most_recent_action,
-            "p1_move": footsies_move_id_to_index[state.p1_move],
-            "p2_move": footsies_move_id_to_index[state.p2_move],
+            "frame": state.globalFrame,
+            "p1_action": state.p1MostRecentAction,
+            "p2_action": state.p2MostRecentAction,
+            "p1_move": footsies_move_id_to_index[state.p1Move],
+            "p2_move": footsies_move_id_to_index[state.p2Move],
         }
 
     def _get_sparse_reward(
         self, state: FootsiesState, next_state: FootsiesState, terminated: bool
     ) -> float:
         """Get the sparse reward from this environment step. Equal to 1 or -1 on win/loss, respectively"""
-        return (1 if next_state.p2_vital == 0 else -1) if terminated else 0
+        return (1 if next_state.p2Vital == 0 else -1) if terminated else 0
 
     def _get_dense_reward(
         self, state: FootsiesState, next_state: FootsiesState, terminated: bool
     ) -> float:
         """Get the dense reward from this environment step. Sums up to 1 or -1 on win/loss, but is also given when inflicting/dealing guard damage (0.3 and -0.3, respectively)"""
         reward = 0.0
-        if next_state.p1_guard < state.p1_guard:
+        if next_state.p1Guard < state.p1Guard:
             reward -= 0.3
-        if next_state.p2_guard < state.p2_guard:
+        if next_state.p2Guard < state.p2Guard:
             reward += 0.3
 
         self._cummulative_episode_reward += reward
 
         if terminated:
             reward += (
-                1 if next_state.p2_vital == 0 else -1
+                1 if next_state.p2Vital == 0 else -1
             ) - self._cummulative_episode_reward
 
         return reward
 
+    def _remote_control_send_command(self, command: RemoteControlCommand, value: str = "") -> "any":
+        """Send a command to the game"""
+        if command == self.RemoteControlCommand.NONE:
+            return
+        
+        message = {"command": command.value, "value": value}
+        message_json = json.dumps(message).encode("utf-8")
+        
+        size_suffix = struct.pack("!I", len(message_json))
+
+        self.remote_control_comm.sendall(size_suffix + message_json)
+
+        if command == self.RemoteControlCommand.STATE_SAVE:
+            battle_state_json = self._game_recv_message(self.remote_control_comm)
+            return FootsiesBattleState.from_json(battle_state_json)
+
+    def save_battle_state(self) -> FootsiesBattleState:
+        """Save the current game state"""
+        return self._remote_control_send_command(self.RemoteControlCommand.STATE_SAVE)
+
+    def load_battle_state(self, battle_state: FootsiesBattleState):
+        """Make the game load a specific battle state"""
+        self._remote_control_send_command(self.RemoteControlCommand.STATE_LOAD, battle_state.json())
+
+    def _request_reset(self):
+        """Request an environment reset"""
+        self._remote_control_send_command(self.RemoteControlCommand.RESET)
+
     def reset(self, *, seed: int = None, options: dict = None) -> "tuple[dict, dict]":
         if not self.has_terminated:
+            # TODO: switch to proper reset method
+            # self._request_reset()
             self._hard_reset()
         
         self.delayed_frame_queue.clear()
@@ -403,15 +457,15 @@ class FootsiesEnv(gym.Env):
         state = self.delayed_frame_queue.popleft()
 
         # In the terminal state, the defeated opponent gets into a move (DEAD) that doesn't occur throughout the game, so in that case we default to STAND
-        state.p1_move = (
-            state.p1_move
-            if state.p1_move
+        state.p1Move = (
+            state.p1Move
+            if state.p1Move
             not in {FootsiesMove.DEAD.value.id, FootsiesMove.WIN.value.id}
             else FootsiesMove.STAND.value.id
         )
-        state.p2_move = (
-            state.p2_move
-            if state.p2_move
+        state.p2Move = (
+            state.p2Move
+            if state.p2Move
             not in {FootsiesMove.DEAD.value.id, FootsiesMove.WIN.value.id}
             else FootsiesMove.STAND.value.id
         )
@@ -420,7 +474,7 @@ class FootsiesEnv(gym.Env):
         obs = self._extract_obs(state)
         info = self._extract_info(state)
 
-        terminated = most_recent_state.p1_vital == 0 or most_recent_state.p2_vital == 0
+        terminated = most_recent_state.p1Vital == 0 or most_recent_state.p2Vital == 0
         reward = (
             self._get_dense_reward(previous_state, most_recent_state, terminated)
             if self.dense_reward
@@ -438,6 +492,7 @@ class FootsiesEnv(gym.Env):
 
     def close(self):
         self.comm.close()  # game should close as well after socket is closed
+        self.remote_control_comm.close()
         if self.opponent_comm is not None:
             self.opponent_comm.close()
         if self._game_instance is not None:
@@ -485,11 +540,13 @@ class FootsiesEnv(gym.Env):
 
 
 if __name__ == "__main__":
+    import pprint
+
     env = FootsiesEnv(
-        game_path="Build/FOOTSIES.x86_64",
+        game_path="Build/FOOTSIES.exe",
         render_mode="human",
         sync_mode="synced_non_blocking",
-        vs_player=True,
+        vs_player=False,
         fast_forward=True,
         log_file="out.log",
         log_file_overwrite=True,
@@ -508,9 +565,9 @@ if __name__ == "__main__":
 
     try:
         while True:
-            terminated = False
+            terminated, truncated = False, False
             observation, info = env.reset()
-            while not terminated:
+            while not (terminated or truncated):
                 time_current = monotonic()  # for fps tracking
                 action = env.action_space.sample()
                 next_observation, reward, terminated, truncated, info = env.step(action)
@@ -522,6 +579,20 @@ if __name__ == "__main__":
                     f"Episode {episode_counter:>3} | {0 if seconds == 0 else frames / seconds:>7.2f} fps | P1 {wins_counter / (episode_counter) if episode_counter > 0 else 0:>7.2%} win rate",
                     end="\r",
                 )
+
+                ipt = input("What to do? (s: save | l: load | r: reset)\n")
+                if ipt == "s":
+                    battle_state = env.save_battle_state()
+                    pprint.pprint(battle_state, depth=2, indent=1)
+                elif ipt == "l":
+                    if battle_state is None:
+                        print("No battle state has been saved")
+                    else:
+                        env.load_battle_state(battle_state)
+                elif ipt == "r":
+                    # Force reset() to be called again
+                    truncated = True
+
                 # action_to_string = lambda t: " ".join(("O" if a else " ") for a in t)
                 # print(f"P1: {action_to_string(info['p1_action']):} | P2: {action_to_string(info['p2_action'])}")
             episode_counter += 1

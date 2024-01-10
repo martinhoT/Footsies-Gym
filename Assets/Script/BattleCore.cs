@@ -82,6 +82,7 @@ namespace Footsies
         private float endStateSkippableTime = 1.5f;
 
         private TrainingManager trainingManager;
+        private TrainingRemoteControl trainingRemoteControl;
         private EnvironmentState currentEnvironmentState;
 
         void Awake()
@@ -104,6 +105,7 @@ namespace Footsies
         void Start()
         {
             trainingManager = GameManager.Instance.trainingManager;
+            trainingRemoteControl = GameManager.Instance.trainingRemoteControl;
 
             if (trainingManager.isTraining)
             {
@@ -112,6 +114,7 @@ namespace Footsies
                 GameManager.Instance.botP2?.SetAI(new BattleAI(this, false));
 
                 trainingManager.Setup();
+                trainingRemoteControl.Setup();
 
                 // Skip the intro and outro sequences. Note: we still have to transition to these states since they set up the battle and prepare the next one
                 introStateTime = 0f; // TODO: intro time is important for FOOTSIES since moves can be charged during this time
@@ -122,12 +125,32 @@ namespace Footsies
 
         void OnDestroy()
         {
-            // OnDestroy() may be called before Start()
+            // OnDestroy() may be called before Start(), so we use null-conditional operators
             trainingManager?.Close();
+            trainingRemoteControl?.Close();
         }
 
         void FixedUpdate()
         {
+            TrainingRemoteControl.Command command = trainingRemoteControl.ProcessCommand();
+            switch (command)
+            {
+                case TrainingRemoteControl.Command.RESET:
+                    Debug.Log("Received RESET command");
+                    ChangeRoundState(RoundStateType.Intro);
+                    break;
+
+                case TrainingRemoteControl.Command.STATE_SAVE:
+                    Debug.Log("Received STATE SAVE command");
+                    trainingRemoteControl.SendBattleState(SaveState());
+                    break;
+
+                case TrainingRemoteControl.Command.STATE_LOAD:
+                    Debug.Log("Received STATE LOAD command");
+                    LoadState(trainingRemoteControl.GetDesiredBattleState());
+                    break;
+            }
+
             switch(_roundState)
             {
                 case RoundStateType.Stop:
@@ -277,19 +300,7 @@ namespace Footsies
 
         void UpdateIntroState()
         {
-            InputData p1Input = null;
-            // Ignore the battle intro, only start listening for actions when battle actually starts
-            if (trainingManager.isTraining)
-            {
-                p1Input = new InputData
-                {
-                    time = Time.fixedTime - roundStartTime
-                };
-            }
-            else
-            {
-                p1Input = GetP1InputData();
-            }
+            var p1Input = GetP1InputData();
             var p2Input = GetP2InputData();
             RecordInput(p1Input, p2Input);
             fighter1.UpdateInput(p1Input);
@@ -356,7 +367,7 @@ namespace Footsies
 
             var time = Time.fixedTime - roundStartTime;
 
-            InputData p1Input = new InputData();
+            InputData p1Input = new();
             if (trainingManager.isTraining)
             {
                 p1Input.input = trainingManager.p1Input();
@@ -386,7 +397,7 @@ namespace Footsies
 
             var time = Time.fixedTime - roundStartTime;
 
-            InputData p2Input = new InputData();
+            InputData p2Input = new();
 
             if (trainingManager.isTraining)
             {
@@ -647,6 +658,24 @@ namespace Footsies
                 return p2FrameLeft - p1FrameLeft;
             else
                 return p1FrameLeft - p2FrameLeft;
+        }
+
+        public BattleState SaveState()
+        {
+            return new(
+                this,
+                roundStartTime,
+                frameCount
+            );
+        }
+
+        public void LoadState(BattleState state)
+        {
+            fighter1.LoadState(state.p1State);
+            fighter2.LoadState(state.p2State);
+
+            roundStartTime = state.roundStartTime;
+            frameCount = state.frameCount;
         }
     }
 

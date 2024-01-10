@@ -5,6 +5,7 @@ using System;
 
 namespace Footsies
 {
+    // Environment state variables to be sent over the network to the agent
     [Serializable]
     public class EnvironmentState
     {

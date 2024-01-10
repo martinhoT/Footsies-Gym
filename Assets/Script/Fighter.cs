@@ -1,10 +1,10 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
 namespace Footsies
 {
-
     public class BoxBase
     {
         public Rect rect;
@@ -707,13 +707,107 @@ namespace Footsies
         {
             var sign = isFaceRight ? 1 : -1;
 
-            var fightPosRect = new Rect();
-            fightPosRect.x = basePosition.x + (dataRect.x * sign);
-            fightPosRect.y = basePosition.y + dataRect.y;
-            fightPosRect.width = dataRect.width;
-            fightPosRect.height = dataRect.height;
+            var fightPosRect = new Rect
+            {
+                x = basePosition.x + (dataRect.x * sign),
+                y = basePosition.y + dataRect.y,
+                width = dataRect.width,
+                height = dataRect.height
+            };
 
             return fightPosRect;
+        }
+
+        public FighterState SaveState()
+        {
+            return new(
+                this,
+                inputRecordFrame,
+                input,
+                inputDown,
+                inputUp,
+                isInputBackward,
+                isReserveProximityGuard,
+                bufferActionID,
+                reserveDamageActionID,
+                spriteShakePosition,
+                maxSpriteShakeFrame,
+                hasWon
+            );
+        }
+
+        public void LoadState(FighterState state)
+        {
+            position.x = state.position[0];
+            position.y = state.position[1];
+            velocity_x = state.velocity_x;
+            isFaceRight = state.isFaceRight;
+            
+            hitboxes.Clear();
+            for (int i = 0; i < state.hitboxes.Length; i++)
+            {
+                FighterState.StateHitbox stateHitbox = state.hitboxes[i];
+                Hitbox hitbox = new();
+
+                hitbox.rect.Set(
+                    stateHitbox.rect.x,
+                    stateHitbox.rect.y,
+                    stateHitbox.rect.width,
+                    stateHitbox.rect.height
+                );
+
+                hitbox.attackID = stateHitbox.attackID;
+                hitbox.proximity = stateHitbox.proximity;
+
+                hitboxes.Add(hitbox);
+            }
+
+            hurtboxes.Clear();
+            for (int i = 0; i < state.hurtboxes.Length; i++)
+            {
+                FighterState.StateRect stateHurbox = state.hurtboxes[i];
+                Hurtbox hurtbox = new();
+
+                hurtbox.rect.Set(
+                    stateHurbox.x,
+                    stateHurbox.y,
+                    stateHurbox.width,
+                    stateHurbox.height
+                );
+
+                hurtboxes.Add(hurtbox);
+            }
+
+            pushbox.rect.Set(
+                state.pushbox.x,
+                state.pushbox.y,
+                state.pushbox.width,
+                state.pushbox.height
+            );
+            
+            vitalHealth = state.vitalHealth;
+            guardHealth = state.guardHealth;
+            
+            currentActionID = state.currentActionID;
+            currentActionFrame = state.currentActionFrame;
+            currentActionHitCount = state.currentActionHitCount;
+            
+            currentHitStunFrame = state.currentHitStunFrame;
+            
+            input = state.input;
+            inputDown = state.inputDown;
+            inputUp = state.inputUp;
+            
+            isInputBackward = state.isInputBackward;
+            isReserveProximityGuard = state.isReserveProximityGuard;
+            
+            bufferActionID = state.bufferActionID;
+            reserveDamageActionID = state.reserveDamageActionID;
+            
+            spriteShakePosition = state.spriteShakePosition;
+            maxSpriteShakeFrame = state.maxSpriteShakeFrame;
+            
+            hasWon = state.hasWon;
         }
     }
 }

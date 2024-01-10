@@ -17,6 +17,7 @@ namespace Footsies
         public SceneIndex currentScene { get; private set; }
         public bool isVsCPU { get; private set; }
         public TrainingManager trainingManager { get; private set; }
+        public TrainingRemoteControl trainingRemoteControl { get; private set; }
 
         // These two variables will contain the respective TrainingBattleAIActor, if they were instanced
         // here in the GameManager. We provide these instances so that BattleCore can properly initialize
@@ -39,6 +40,8 @@ namespace Footsies
             // Default values
             bool argIsTrainingEnv = false;
             int argTrainingSyncMode = 0; // 0: async | 1: sync non-blocking | 2: sync blocking
+            string argRemoteControlAddress = "localhost";
+            int argRemoteControlPort = 11002;
             bool argP1Bot = false;
             bool argP1Player = false;
             bool argP1Spectator = false;
@@ -103,6 +106,14 @@ namespace Footsies
                         shouldMute = true;
                         break;
                     
+                    case "--remote-control-address":
+                        argRemoteControlAddress = args[argIndex + 1];
+                        break;
+                    
+                    case "--remote-control-port":
+                        argRemoteControlPort = Convert.ToUInt16(args[argIndex + 1]);
+                        break;
+
                     case "--p1-address":
                         argP1TrainingAddress = args[argIndex + 1];
                         break;
@@ -141,6 +152,8 @@ namespace Footsies
                             : "async"
                 ) + "\n"
                 + "   Mute? " + shouldMute + "\n"
+                + "   Remote Control address: " + argRemoteControlAddress + "\n"
+                + "   Remote Control port: " + argRemoteControlPort + "\n"
                 + "   P1 Bot? " + argP1Bot + "\n"
                 + "   P1 Player? " + argP1Player + "\n"
                 + "   P1 Spectator? " + argP1Spectator + "\n"
@@ -182,6 +195,8 @@ namespace Footsies
                 actorP2 = new TrainingActorRemoteSpectator(argP2TrainingAddress, argP2TrainingPort, argTrainingSyncMode == 2, actorP2);
 
             trainingManager = new TrainingManager(argIsTrainingEnv, argTrainingSyncMode > 0, actorP1, actorP2);
+
+            trainingRemoteControl = new TrainingRemoteControl(argRemoteControlAddress, argRemoteControlPort, argTrainingSyncMode == 2);
         }
 
         private void Start()
