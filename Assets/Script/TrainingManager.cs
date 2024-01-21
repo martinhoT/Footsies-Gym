@@ -59,27 +59,19 @@ namespace Footsies
         {
             if (!isTraining) { return; }
 
-            // Don't send the environment state until the agents are ready to receive it (relevant when training is async)
-            // Otherwise, for the TrainingRemoteActor agents, the socket will be filled with state messages, with only one of them being up-to-date
-            if (actorP1.Ready())
-            {
-                actorP1.UpdateCurrentState(state, battleOver);
+            actorP1.UpdateCurrentState(state, battleOver);
 
-                // Request another action from the training agent, as long as the environment hasn't terminated
-                if (!battleOver)
-                {
-                    actorP1.RequestNextInput();
-                }
+            // Request another action from the training agent, as long as the environment hasn't terminated
+            if (!battleOver)
+            {
+                actorP1.RequestNextInput();
             }
 
-            if (actorP2.Ready())
-            {
-                actorP2.UpdateCurrentState(state, battleOver);
+            actorP2.UpdateCurrentState(state, battleOver);
 
-                if (!battleOver)
-                {
-                    actorP2.RequestNextInput();
-                }
+            if (!battleOver)
+            {
+                actorP2.RequestNextInput();
             }
         }
 

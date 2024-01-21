@@ -4,6 +4,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
 using System;
+using System.Threading;
 
 namespace Footsies
 {
@@ -16,7 +17,7 @@ namespace Footsies
         public int port { get; private set; }
         public bool syncedComms { get; private set; }
 
-        private Task<int> mostRecentAsyncStateRequest = null;
+        private Task<int> stateRequest = null;
 
         private Socket trainingListener;
         private Socket trainingSocket;
@@ -87,14 +88,10 @@ namespace Footsies
             string stateJson = JsonUtility.ToJson(state);
             byte[] stateBytes = Encoding.UTF8.GetBytes(stateJson);
 
-            Debug.Log("Sending the game's current state...");
+            Debug.Log("Sending the game's current state (frame: " + state.globalFrame + ")");
+            stateRequest = SocketHelper.SendWithSizeSuffixAsync(trainingSocket, stateBytes);
             if (syncedComms)
-                SocketHelper.SendWithSizeSuffix(trainingSocket, stateBytes);
-            else
-                mostRecentAsyncStateRequest = SocketHelper.SendWithSizeSuffixAsync(trainingSocket, stateBytes);
-            Debug.Log("Current state received by the spectator! (frame: " + state.globalFrame + ")");
-
-            mostRecentAsyncStateRequest = null;
+                stateRequest.Wait();
         }
 
         public int GetInput()
@@ -109,7 +106,7 @@ namespace Footsies
 
         public bool Ready()
         {
-            return actor.Ready() && (mostRecentAsyncStateRequest == null || mostRecentAsyncStateRequest.IsCompleted);
+            return actor.Ready() && (stateRequest == null || stateRequest.IsCompleted);
         }
     }
 }

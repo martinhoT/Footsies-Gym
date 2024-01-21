@@ -55,6 +55,7 @@ namespace Footsies
             int argP2TrainingPort = 11001;
             bool argP2NoState = false;
             bool argFastForward = false;
+            
             int argIndex = 0;
             foreach (var arg in args)
             {

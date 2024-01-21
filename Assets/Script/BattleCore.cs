@@ -83,7 +83,6 @@ namespace Footsies
 
         private TrainingManager trainingManager;
         private TrainingRemoteControl trainingRemoteControl;
-        private EnvironmentState currentEnvironmentState;
 
         void Awake()
         {
@@ -193,7 +192,7 @@ namespace Footsies
                     {
                         ChangeRoundState(RoundStateType.KO);
                     }
-                    trainingManager.Step(currentEnvironmentState, battleOver);
+                    trainingManager.Step(GetEnvironmentState(), battleOver);
 
                     break;
                 case RoundStateType.KO:
@@ -258,7 +257,7 @@ namespace Footsies
                     currentRecordingInputIndex = 0;
 
                     // Environment reset, should send initial state first before receiving actions, and request the first action
-                    trainingManager.Step(currentEnvironmentState, false);
+                    trainingManager.Step(GetEnvironmentState(), false);
 
                     break;
                 case RoundStateType.KO:
@@ -314,8 +313,6 @@ namespace Footsies
 
             UpdatePushCharacterVsCharacter();
             UpdatePushCharacterVsBackground();
-
-            UpdateEnvironmentState();
         }
 
         void UpdateFightState()
@@ -335,8 +332,6 @@ namespace Footsies
             UpdatePushCharacterVsCharacter();
             UpdatePushCharacterVsBackground();
             UpdateHitboxHurtboxCollision();
-
-            UpdateEnvironmentState();
         }
 
         void UpdateKOState()
@@ -354,8 +349,6 @@ namespace Footsies
 
             UpdatePushCharacterVsCharacter();
             UpdatePushCharacterVsBackground();
-
-            UpdateEnvironmentState();
         }
 
         InputData GetP1InputData()
@@ -424,43 +417,23 @@ namespace Footsies
             return p2Input;
         }
 
-        private void UpdateEnvironmentState()
+        private EnvironmentState GetEnvironmentState()
         {
-            if (currentEnvironmentState == null)
-            {
-                currentEnvironmentState = new EnvironmentState(
-                    fighter1.vitalHealth, // p1Vital
-                    fighter2.vitalHealth, // p2Vital
-                    fighter1.guardHealth, // p1Guard
-                    fighter2.guardHealth, // p2Guard
-                    fighter1.currentActionID, // p1Move
-                    fighter1.currentActionFrame, // p1MoveFrame
-                    fighter2.currentActionID, // p2Move
-                    fighter2.currentActionFrame, // p2MoveFrame
-                    fighter1.position.x, // p1Position
-                    fighter2.position.x, // p2Position
-                    frameCount, // globalFrame
-                    recordingP1Input[currentRecordingInputIndex - 1].input, // p1MostRecentAction
-                    recordingP2Input[currentRecordingInputIndex - 1].input // p2MostRecentAction
-                );
-            }
-            else
-            {
-                currentEnvironmentState.p1Vital = fighter1.vitalHealth;
-                currentEnvironmentState.p2Vital = fighter2.vitalHealth;
-                currentEnvironmentState.p1Guard = fighter1.guardHealth;
-                currentEnvironmentState.p2Guard = fighter2.guardHealth;
-                currentEnvironmentState.p1Move = fighter1.currentActionID;
-                currentEnvironmentState.p1MoveFrame = fighter1.currentActionFrame;
-                currentEnvironmentState.p2Move = fighter2.currentActionID;
-                currentEnvironmentState.p2MoveFrame = fighter2.currentActionFrame;
-                currentEnvironmentState.p1Position = fighter1.position.x;
-                currentEnvironmentState.p2Position = fighter2.position.x;
-                currentEnvironmentState.globalFrame = frameCount;
-                currentEnvironmentState.p1MostRecentAction = recordingP1Input[currentRecordingInputIndex - 1].input;
-                currentEnvironmentState.p2MostRecentAction = recordingP2Input[currentRecordingInputIndex - 1].input;
-            }
-            
+            return new EnvironmentState(
+                fighter1.vitalHealth, // p1Vital
+                fighter2.vitalHealth, // p2Vital
+                fighter1.guardHealth, // p1Guard
+                fighter2.guardHealth, // p2Guard
+                fighter1.currentActionID, // p1Move
+                fighter1.currentActionFrame, // p1MoveFrame
+                fighter2.currentActionID, // p2Move
+                fighter2.currentActionFrame, // p2MoveFrame
+                fighter1.position.x, // p1Position
+                fighter2.position.x, // p2Position
+                frameCount, // globalFrame
+                (currentRecordingInputIndex > 0) ? recordingP1Input[currentRecordingInputIndex - 1].input : 0, // p1MostRecentAction
+                (currentRecordingInputIndex > 0) ? recordingP2Input[currentRecordingInputIndex - 1].input : 0 // p2MostRecentAction
+            );
         }
 
         private bool IsKOSkipButtonPressed()

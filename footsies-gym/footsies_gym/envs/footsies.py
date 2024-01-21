@@ -9,13 +9,13 @@ from typing import Callable, Tuple
 from time import sleep, monotonic
 from enum import Enum
 from gymnasium import spaces
-from ..state import FootsiesFighterState, FootsiesState, FootsiesBattleState
+from ..state import FootsiesState, FootsiesBattleState
 from ..moves import FootsiesMove, footsies_move_id_to_index
 from .exceptions import FootsiesGameClosedError
 
 # TODO: move training agent input reading (through socket comms) to Update() instead of FixedUpdate()
 # TODO: dynamically change the game's timeScale value depending on the estimated framerate
-# TODO: reset functionality (need to be able to stop previous player input requests from the game)
+# TODO: opponent change to in-game bot over remote control
 
 
 class FootsiesEnv(gym.Env):
@@ -37,6 +37,7 @@ class FootsiesEnv(gym.Env):
         game_path: str = "./Build/FOOTSIES",
         game_address: str = "localhost",
         game_port: int = 11000,
+        skip_instancing: bool = False,
         fast_forward: bool = True,
         sync_mode: str = "synced_blocking",
         remote_control_port: int = 11002,
@@ -63,6 +64,8 @@ class FootsiesEnv(gym.Env):
             address of the FOOTSIES instance
         game_port: int
             port of the FOOTSIES instance
+        skip_instancing: bool
+            whether to skip instancing of the game
         fast_forward: bool
             whether to run the game at a much faster rate than normal
         sync_mode: str
@@ -103,6 +106,7 @@ class FootsiesEnv(gym.Env):
         self.game_path = game_path
         self.game_address = game_address
         self.game_port = game_port
+        self.skip_instancing = skip_instancing
         self.fast_forward = fast_forward
         self.sync_mode = sync_mode
         self.remote_control_port = remote_control_port
@@ -183,8 +187,11 @@ class FootsiesEnv(gym.Env):
     def _instantiate_game(self):
         """
         Start the FOOTSIES process in the background, with the specified render mode.
-        No-op if already instantiated
+        No-op if already instantiated or instantiation is skipped
         """
+        if self.skip_instancing:
+            return
+        
         if self._game_instance is None:
             args = [
                 self.game_path,
@@ -411,9 +418,7 @@ class FootsiesEnv(gym.Env):
 
     def reset(self, *, seed: int = None, options: dict = None) -> "tuple[dict, dict]":
         if not self.has_terminated:
-            # TODO: switch to proper reset method
-            # self._request_reset()
-            self._hard_reset()
+            self._request_reset()
         
         self.delayed_frame_queue.clear()
         self._cummulative_episode_reward = 0.0
@@ -421,6 +426,9 @@ class FootsiesEnv(gym.Env):
         self._instantiate_game()
         self._connect_to_game()
         first_state = self._receive_and_update_state()
+        # Guarantee it's the first environment state
+        while first_state.globalFrame != -1:
+            first_state = self._receive_and_update_state()
         # We leave a space at the end of the queue since insertion of the most recent state happens before popping the oldest state.
         # This is done so that the case when `frame_delay` is 0 is correctly handled
         while len(self.delayed_frame_queue) < self.delayed_frame_queue.maxlen - 1:
@@ -551,6 +559,7 @@ if __name__ == "__main__":
         log_file="out.log",
         log_file_overwrite=True,
         frame_delay=0,
+        skip_instancing=False,
     )
 
     # Keep track of how many frames/steps were processed each second so that we can adjust how fast the game runs
@@ -580,18 +589,18 @@ if __name__ == "__main__":
                     end="\r",
                 )
 
-                ipt = input("What to do? (s: save | l: load | r: reset)\n")
-                if ipt == "s":
-                    battle_state = env.save_battle_state()
-                    pprint.pprint(battle_state, depth=2, indent=1)
-                elif ipt == "l":
-                    if battle_state is None:
-                        print("No battle state has been saved")
-                    else:
-                        env.load_battle_state(battle_state)
-                elif ipt == "r":
-                    # Force reset() to be called again
-                    truncated = True
+                # ipt = input("What to do? (s: save | l: load | r: reset)\n")
+                # if ipt == "s":
+                #     battle_state = env.save_battle_state()
+                #     pprint.pprint(battle_state, depth=2, indent=1)
+                # elif ipt == "l":
+                #     if battle_state is None:
+                #         print("No battle state has been saved")
+                #     else:
+                #         env.load_battle_state(battle_state)
+                # elif ipt == "r":
+                #     # Force reset() to be called again
+                #     truncated = True
 
                 # action_to_string = lambda t: " ".join(("O" if a else " ") for a in t)
                 # print(f"P1: {action_to_string(info['p1_action']):} | P2: {action_to_string(info['p2_action'])}")

@@ -3,6 +3,9 @@ using System;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Threading.Tasks;
+using System.Threading;
+using System.Drawing.Printing;
 
 namespace Footsies
 {
@@ -18,7 +21,10 @@ namespace Footsies
         // Whether the agent is ready to receive the environment state, usually after input from it has been received. It's true on environment reset
         public bool inputReady { get; private set; } = true;
 
+
         private int input = 0;
+        private Task inputRequest;
+        private Task<int> stateRequest;
 
         private Socket trainingListener;
         private Socket trainingSocket;
@@ -67,24 +73,15 @@ namespace Footsies
 
         public void UpdateCurrentState(EnvironmentState state, bool battleOver)
         {
-            // We will only send the current state if the remote actor is ready to receive it, which we assume it is if it has already acted
-            if (!noState && inputReady)
+            if (!noState)
             {
                 string stateJson = JsonUtility.ToJson(state);
                 byte[] stateBytes = Encoding.UTF8.GetBytes(stateJson);
 
-                Debug.Log("Sending the game's current state...");
+                Debug.Log("Sending the game's current state (frame: " + state.globalFrame + ")");
+                stateRequest = SocketHelper.SendWithSizeSuffixAsync(trainingSocket, stateBytes);
                 if (syncedComms)
-                    SocketHelper.SendWithSizeSuffix(trainingSocket, stateBytes);
-                else
-                    SocketHelper.SendWithSizeSuffixAsync(trainingSocket, stateBytes);
-                Debug.Log("Current state received by the agent! (frame: " + state.globalFrame + ")");
-            }
-
-            // If we haven't received the terminal environment state, then we will be set to act again, otherwise we just wait to receive the next non-terminal state
-            if (!battleOver)
-            {
-                inputReady = false;
+                    stateRequest.Wait();
             }
         }
 
@@ -96,32 +93,36 @@ namespace Footsies
         // no-op if a request is still unfulfilled
         public void RequestNextInput()
         {
-            if (!inputReady && !inputRequested)
+            // recycle the same input request if the previous one hasn't completed yet
+            if (inputRequest != null && !inputRequest.IsCompleted)
             {
-                inputRequested = true;
-                if (syncedComms)
-                    ReceiveTrainingInput();
-                else
-                    ReceiveTrainingInputAsync();
+                Debug.Log("Requested input from agent, but a request already exists, ignoring");
+                return;
             }
-            else {
-                Debug.Log("ERROR: training input request could not be performed!");
+
+            inputRequest = RequestTrainingInput();
+            if (syncedComms)
+            {
+                inputRequest.Wait();
             }
         }
 
         public bool Ready()
         {
-            return inputReady;
+            return inputRequest == null || inputRequest.IsCompleted;
         }
 
-        private void ReceiveTrainingInput()
+        private async Task RequestTrainingInput()
         {
             byte[] actionMessageContent = {0, 0, 0};
             ArraySegment<byte> actionMessage = new(actionMessageContent);
 
             Debug.Log("Waiting for the agent's action...");
-            int bytesReceived = trainingSocket.Receive(actionMessage, SocketFlags.None);
+            // Corrected implementation of ReceiveAsync with a cancellation token... (https://github.com/mono/mono/issues/20902)
+            var receiveTask = trainingSocket.ReceiveAsync(actionMessage, SocketFlags.None);
+            int bytesReceived = await receiveTask.ConfigureAwait(false);
             Debug.Log("Agent action received! (" + (int)actionMessageContent[0] + ", " + (int)actionMessageContent[1] + ", " + (int)actionMessageContent[2] + ")");
+
             // EOF has been reached, communication has likely been stopped on the agent's side
             if (bytesReceived == 0)
             {
@@ -132,42 +133,11 @@ namespace Footsies
             {
                 Debug.Log("ERROR: abnormal number of bytes received from agent's action message (sent " + bytesReceived + ", expected 3)");
             }
-            
+
             input = 0;
             input |= actionMessageContent[0] != 0 ? (int)InputDefine.Left : 0;
             input |= actionMessageContent[1] != 0 ? (int)InputDefine.Right : 0;
             input |= actionMessageContent[2] != 0 ? (int)InputDefine.Attack : 0;
-
-            inputRequested = false;
-            inputReady = true;
-        }
-
-        private async void ReceiveTrainingInputAsync()
-        {
-            byte[] actionMessageContent = {0, 0, 0};
-            ArraySegment<byte> actionMessage = new(actionMessageContent);
-
-            Debug.Log("Waiting for the agent's action...");
-            int bytesReceived = await trainingSocket.ReceiveAsync(actionMessage, SocketFlags.None);
-            Debug.Log("Agent action received ASYNC! (" + (int)actionMessageContent[0] + ", " + (int)actionMessageContent[1] + ", " + (int)actionMessageContent[2] + ")");
-            // EOF has been reached, communication has likely been stopped on the agent's side
-            if (bytesReceived == 0)
-            {
-                Debug.Log("Training agent has ceased communication, quitting...");
-                Application.Quit();
-            }
-            else if (bytesReceived != 3)
-            {
-                Debug.Log("ERROR: abnormal number of bytes received from agent's action message (sent " + bytesReceived + ", expected 3)");
-            }
-            
-            input = 0;
-            input |= actionMessageContent[0] != 0 ? (int)InputDefine.Left : 0;
-            input |= actionMessageContent[1] != 0 ? (int)InputDefine.Right : 0;
-            input |= actionMessageContent[2] != 0 ? (int)InputDefine.Attack : 0;
-
-            inputRequested = false;
-            inputReady = true;
         }
     }
 }

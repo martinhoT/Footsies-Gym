@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Net.Sockets;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Footsies
@@ -19,6 +20,12 @@ namespace Footsies
         {
             byte[] messageWithSuffix = AddSizeSuffix(message);
             return socket.SendAsync(messageWithSuffix, SocketFlags.None);
+        }
+
+        public static Task<int> SendWithSizeSuffixAsync(Socket socket, byte[] message, CancellationToken cancellationToken)
+        {
+            byte[] messageWithSuffix = AddSizeSuffix(message);
+            return socket.SendAsync(messageWithSuffix, SocketFlags.None, cancellationToken).AsTask();
         }
 
         public static void ReceiveMessage(Socket socket, List<byte> message)
