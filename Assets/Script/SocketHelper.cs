@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Net;
 using System.Net.Sockets;
-using System.Threading;
 using System.Threading.Tasks;
 
 namespace Footsies
@@ -10,22 +10,45 @@ namespace Footsies
     public class SocketHelper
     {
 
+        public static async Task<Socket> AcceptConnectionAsync(string address, int port)
+        {
+            // Setup Socket server to listen for the agent's actions
+            IPAddress hostIPAddress = null;
+            foreach (var hostAddress in Dns.GetHostAddresses(address))
+            {
+                // Only accept IPv4 addresses
+                if (hostAddress.AddressFamily == AddressFamily.InterNetwork)
+                {
+                    hostIPAddress = hostAddress;
+                    break; // return the first one found
+                }
+            }
+            if (hostIPAddress == null)
+            {
+                return null;
+            }
+            IPEndPoint ipEndPoint = new(hostIPAddress, port);
+            
+            Socket listener = new(ipEndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+            listener.Bind(ipEndPoint);
+            listener.Listen(1); // maximum queue length of 1, we only want 1 connection
+            
+            Socket socket = await listener.AcceptAsync().ConfigureAwait(false);
+            listener.Close();
+
+            return socket;
+        }
+
         public static void SendWithSizeSuffix(Socket socket, byte[] message)
         {
             byte[] messageWithSuffix = AddSizeSuffix(message);
             socket.Send(messageWithSuffix, SocketFlags.None);
         }
 
-        public static Task<int> SendWithSizeSuffixAsync(Socket socket, byte[] message)
+        public static async Task<int> SendWithSizeSuffixAsync(Socket socket, byte[] message)
         {
             byte[] messageWithSuffix = AddSizeSuffix(message);
-            return socket.SendAsync(messageWithSuffix, SocketFlags.None);
-        }
-
-        public static Task<int> SendWithSizeSuffixAsync(Socket socket, byte[] message, CancellationToken cancellationToken)
-        {
-            byte[] messageWithSuffix = AddSizeSuffix(message);
-            return socket.SendAsync(messageWithSuffix, SocketFlags.None, cancellationToken).AsTask();
+            return await socket.SendAsync(messageWithSuffix, SocketFlags.None).ConfigureAwait(false);
         }
 
         public static void ReceiveMessage(Socket socket, List<byte> message)

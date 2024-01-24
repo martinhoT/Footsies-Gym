@@ -1,9 +1,11 @@
+using System.Threading.Tasks;
+
 namespace Footsies
 {
     public interface TrainingActor
     {
         // Setup any necessary resources before beginning training
-        void Setup();
+        Task Setup();
 
         // Close all used resources after finishing training
         void Close();

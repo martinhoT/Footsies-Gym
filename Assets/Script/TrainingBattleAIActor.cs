@@ -1,3 +1,5 @@
+using System.Threading.Tasks;
+
 namespace Footsies
 {
     public class TrainingBattleAIActor : TrainingActor
@@ -15,7 +17,7 @@ namespace Footsies
             battleAI = ai;
         }
 
-        public void Setup() {}
+        public Task Setup() { return Task.CompletedTask; }
 
         public void Close() {}
 

@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Threading.Tasks;
 using UnityEngine;
 
 namespace Footsies
@@ -108,12 +109,17 @@ namespace Footsies
 
             if (trainingManager.isTraining)
             {
-                // Awkward case, BattleCore is the only one who can setup the TrainingBattleAIActors, since only it can properly create BattleAIs
-                GameManager.Instance.botP1?.SetAI(new BattleAI(this, true));
-                GameManager.Instance.botP2?.SetAI(new BattleAI(this, false));
+                BattleAI p1Bot = new(this, true);
+                BattleAI p2Bot = new(this, false);
+                trainingRemoteControl.SetP2Saved(trainingManager.actorP2);
+                trainingRemoteControl.SetP2Bot(new TrainingBattleAIActor(p2Bot));
 
-                trainingManager.Setup();
-                trainingRemoteControl.Setup();
+                // Awkward case, BattleCore is the only one who can setup the TrainingBattleAIActors, since only it can properly create BattleAIs
+                GameManager.Instance.botP1?.SetAI(p1Bot);
+                GameManager.Instance.botP2?.SetAI(p2Bot);
+
+                // Wait for everything to setup (mainly remote connections)
+                Task.WhenAll(new Task[] {trainingManager.Setup(), trainingRemoteControl.Setup()}).Wait();
 
                 // Skip the intro and outro sequences. Note: we still have to transition to these states since they set up the battle and prepare the next one
                 introStateTime = 0f; // TODO: intro time is important for FOOTSIES since moves can be charged during this time
@@ -147,6 +153,18 @@ namespace Footsies
                 case TrainingRemoteControl.Command.STATE_LOAD:
                     Debug.Log("Received STATE LOAD command");
                     LoadState(trainingRemoteControl.GetDesiredBattleState());
+                    break;
+                
+                case TrainingRemoteControl.Command.P2_BOT:
+                    Debug.Log("Received P2 BOT command");
+                    if (trainingRemoteControl.isP2Bot)
+                    {
+                        trainingManager.actorP2 = trainingRemoteControl.p2Bot;
+                    }
+                    else
+                    {
+                        trainingManager.actorP2 = trainingRemoteControl.p2Saved;
+                    }
                     break;
             }
 

@@ -2,6 +2,8 @@ using UnityEngine;
 using System;
 using System.Net.Sockets;
 using System.Text;
+using System.Threading.Tasks;
+using System.ComponentModel;
 
 namespace Footsies
 {
@@ -24,14 +26,13 @@ namespace Footsies
             this.actorP2 = actorP2;
         }
 
-        public bool Setup()
+        public async Task<bool> Setup()
         {
             if (!isTraining) { return false; }
 
             if (!isAlreadySetup)
             {
-                actorP1.Setup();
-                actorP2.Setup();
+                await Task.WhenAll(new Task[] {actorP1.Setup(), actorP2.Setup()}).ConfigureAwait(false);
 
                 isAlreadySetup = true;
                 return true;

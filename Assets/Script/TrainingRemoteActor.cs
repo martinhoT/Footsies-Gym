@@ -1,11 +1,8 @@
 using UnityEngine;
 using System;
-using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
-using System.Threading;
-using System.Drawing.Printing;
 
 namespace Footsies
 {
@@ -16,17 +13,11 @@ namespace Footsies
         public bool syncedComms { get; private set; }
         public bool noState { get; private set; }
 
-        // Whether we already requested for the agent's input
-        public bool inputRequested { get; private set; } = false;
-        // Whether the agent is ready to receive the environment state, usually after input from it has been received. It's true on environment reset
-        public bool inputReady { get; private set; } = true;
-
-
+        private bool connected = false;
         private int input = 0;
         private Task inputRequest;
         private Task<int> stateRequest;
 
-        private Socket trainingListener;
         private Socket trainingSocket;
 
         public TrainingRemoteActor(string address, int port, bool syncedComms, bool noState)
@@ -37,38 +28,26 @@ namespace Footsies
             this.noState = noState;
         }
 
-        public void Setup()
+        public async Task Setup()
         {
-            // Setup Socket server to listen for the agent's actions
-            IPAddress hostIPAddress = null;
-            foreach (var hostAddress in Dns.GetHostAddresses(address))
-            {
-                // Only accept IPv4 addresses
-                if (hostAddress.AddressFamily == AddressFamily.InterNetwork)
-                {
-                    hostIPAddress = hostAddress;
-                    break; // return the first one found
-                }
-            }
-            if (hostIPAddress == null)
+            Debug.Log("Waiting for the agent to connect to address '" + address + "' with port " + port + "...");
+            trainingSocket = await SocketHelper.AcceptConnectionAsync(address, port).ConfigureAwait(false);
+            if (trainingSocket == null)
             {
                 Debug.Log("ERROR: could not find any suitable IPv4 address for '" + address + "'! Quitting...");
                 Application.Quit();
             }
-            IPEndPoint ipEndPoint = new(hostIPAddress, port);
-            trainingListener = new Socket(ipEndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
-            trainingListener.Bind(ipEndPoint);
-            trainingListener.Listen(1); // maximum queue length of 1, there is only 1 agent
-            Debug.Log("Waiting for the agent to connect to address '" + hostIPAddress.ToString() + "'...");
-            trainingSocket = trainingListener.Accept();
             Debug.Log("Agent connection received!");
-            trainingListener.Close();
+
+            connected = true;
         }
 
         public void Close()
         {
             trainingSocket.Shutdown(SocketShutdown.Both);
             trainingSocket.Close();
+
+            connected = false;
         }
 
         public void UpdateCurrentState(EnvironmentState state, bool battleOver)
@@ -109,7 +88,7 @@ namespace Footsies
 
         public bool Ready()
         {
-            return inputRequest == null || inputRequest.IsCompleted;
+            return connected && (inputRequest == null || inputRequest.IsCompleted);
         }
 
         private async Task RequestTrainingInput()

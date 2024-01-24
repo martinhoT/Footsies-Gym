@@ -15,7 +15,6 @@ from .exceptions import FootsiesGameClosedError
 
 # TODO: move training agent input reading (through socket comms) to Update() instead of FixedUpdate()
 # TODO: dynamically change the game's timeScale value depending on the estimated framerate
-# TODO: opponent change to in-game bot over remote control
 
 
 class FootsiesEnv(gym.Env):
@@ -29,6 +28,7 @@ class FootsiesEnv(gym.Env):
         RESET = 1
         STATE_SAVE = 2
         STATE_LOAD = 3
+        P2_BOT = 4
 
     def __init__(
         self,
@@ -416,6 +416,31 @@ class FootsiesEnv(gym.Env):
         """Request an environment reset"""
         self._remote_control_send_command(self.RemoteControlCommand.RESET)
 
+    def _request_opponent_change(self, bot: bool):
+        """Request that the game changes player 2 to be either the in-game bot or a remote opponent"""
+        self._remote_control_send_command(self.RemoteControlCommand.P2_BOT, str(bot))
+
+    def set_opponent(self, opponent: Callable[[dict], Tuple[bool, bool, bool]]):
+        """
+        Set the agent's opponent to the specified custom policy, or `None` if the default environment opponent should be used.
+        Returns whether the environment requires calling `reset(...)` after calling this method.
+
+        WARNING: the environment needs to be set up with a custom opponent on creation (may be a dummy one), or else this method will raise an exception.
+        """
+        # TODO: maybe try making this not a requirement
+        if self.opponent_comm is None:
+            raise RuntimeError("the environment needs to be created with a custom opponent before calling this method")
+
+        require_request = (opponent is not None and self.opponent is None) or (
+            opponent is None and self.opponent is not None
+        )
+
+        # Update the internal custom opponent policy
+        self.opponent = opponent
+
+        if require_request:
+            self._request_opponent_change(bot=self.opponent is None)
+
     def reset(self, *, seed: int = None, options: dict = None) -> "tuple[dict, dict]":
         if not self.has_terminated:
             self._request_reset()
@@ -506,46 +531,6 @@ class FootsiesEnv(gym.Env):
         if self._game_instance is not None:
             self._game_instance.kill()  # just making sure the game is closed
 
-    def _hard_reset(self):
-        """Reset the entire environment, closing the socket connections and the game. The next `reset()` call will recreate these resources"""
-        self.close()
-
-        self.comm = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.comm.settimeout(self.COMM_TIMEOUT)
-
-        self.opponent_comm = (
-            socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            if self.opponent is not None
-            else None
-        )
-        if self.opponent_comm is not None:
-            self.opponent_comm.settimeout(self.COMM_TIMEOUT)
-
-        self._connected = False
-        self._opponent_connected = False
-        self._game_instance = None
-
-    def set_opponent(self, opponent: Callable[[dict], Tuple[bool, bool, bool]]) -> bool:
-        """
-        Set the agent's opponent to the specified custom policy, or `None` if the default environment opponent should be used.
-        Returns whether the environment requires calling `reset(...)` after calling this method.
-
-        WARNING: will cause a hard reset on the environment if changing between the environment's AI and the custom opponent, closing the socket connections and the game!
-        There is no hard reset if merely changing custom opponent policies.
-        """
-        require_hard_reset = (opponent is not None and self.opponent is None) or (
-            opponent is None and self.opponent is not None
-        )
-
-        # This internal variable needs to be updated before hard-resetting
-        self.opponent = opponent
-
-        # TODO: ideally this shouldn't be required, makes changing between the in-game and custom opponent costly
-        if require_hard_reset:
-            self._hard_reset()
-        
-        return require_hard_reset
-
 
 if __name__ == "__main__":
     import pprint
@@ -555,11 +540,12 @@ if __name__ == "__main__":
         render_mode="human",
         sync_mode="synced_non_blocking",
         vs_player=False,
-        fast_forward=True,
+        fast_forward=False,
         log_file="out.log",
         log_file_overwrite=True,
         frame_delay=0,
         skip_instancing=False,
+        opponent=lambda d: (False, False, False),
     )
 
     # Keep track of how many frames/steps were processed each second so that we can adjust how fast the game runs
@@ -571,6 +557,9 @@ if __name__ == "__main__":
 
     episode_counter = 0
     wins_counter = 0
+
+    # Only to test opponent change through the remote control
+    use_custom_opponent = False
 
     try:
         while True:
@@ -589,18 +578,21 @@ if __name__ == "__main__":
                     end="\r",
                 )
 
-                # ipt = input("What to do? (s: save | l: load | r: reset)\n")
-                # if ipt == "s":
-                #     battle_state = env.save_battle_state()
-                #     pprint.pprint(battle_state, depth=2, indent=1)
-                # elif ipt == "l":
-                #     if battle_state is None:
-                #         print("No battle state has been saved")
-                #     else:
-                #         env.load_battle_state(battle_state)
-                # elif ipt == "r":
-                #     # Force reset() to be called again
-                #     truncated = True
+                ipt = input("What to do? (s: save | l: load | r: reset | o: toggle opponent)\n")
+                if ipt == "s":
+                    battle_state = env.save_battle_state()
+                    pprint.pprint(battle_state, depth=2, indent=1)
+                elif ipt == "l":
+                    if battle_state is None:
+                        print("No battle state has been saved")
+                    else:
+                        env.load_battle_state(battle_state)
+                elif ipt == "r":
+                    # Force reset() to be called again
+                    truncated = True
+                elif ipt == "o":
+                    env.set_opponent((lambda d: (False, False, False)) if use_custom_opponent else None)
+                    use_custom_opponent = not use_custom_opponent
 
                 # action_to_string = lambda t: " ".join(("O" if a else " ") for a in t)
                 # print(f"P1: {action_to_string(info['p1_action']):} | P2: {action_to_string(info['p2_action'])}")

@@ -1,3 +1,5 @@
+using System.Threading.Tasks;
+
 namespace Footsies
 {
     public class TrainingPlayerActor : TrainingActor
@@ -9,7 +11,7 @@ namespace Footsies
             this.player1 = player1;
         }
 
-        public void Setup() {}
+        public Task Setup() { return Task.CompletedTask; }
 
         public void Close() {}
 

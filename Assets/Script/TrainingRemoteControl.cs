@@ -1,9 +1,9 @@
 using UnityEngine;
 using System;
-using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace Footsies
 {
@@ -14,12 +14,14 @@ namespace Footsies
         // - Reset: reset the battle to the beginning
         // - StateSave: request a copy of the current state
         // - StateLoad: request the game to load a specific state
+        // - P2Bot: toggle between the initial actor and the in-game bot for player 2
         public enum Command
         {
             NONE = 0,
             RESET = 1,
             STATE_SAVE = 2,
             STATE_LOAD = 3,
+            P2_BOT = 4,
         }
 
         [Serializable]
@@ -34,11 +36,13 @@ namespace Footsies
         public bool syncedComms { get; private set; }
 
         private BattleState battleState;
+        public TrainingActor p2Saved { get; private set; }
+        public TrainingBattleAIActor p2Bot { get; private set; }
+        public bool isP2Bot { get; private set; }
 
-        private Socket managerListener;
         private Socket managerSocket;
 
-        private bool on;
+        private bool connected;
 
         public TrainingRemoteControl(string address, int port, bool syncedComms)
         {
@@ -47,34 +51,18 @@ namespace Footsies
             this.syncedComms = syncedComms;
         }
 
-        public void Setup()
+        public async Task Setup()
         {
-            // Setup Socket server to listen for the agent's actions
-            IPAddress hostIPAddress = null;
-            foreach (var hostAddress in Dns.GetHostAddresses(address))
-            {
-                // Only accept IPv4 addresses
-                if (hostAddress.AddressFamily == AddressFamily.InterNetwork)
-                {
-                    hostIPAddress = hostAddress;
-                    break; // return the first one found
-                }
-            }
-            if (hostIPAddress == null)
+            Debug.Log("Waiting for the agent to connect to address '" + address + "' with port " + port + "...");
+            managerSocket = await SocketHelper.AcceptConnectionAsync(address, port).ConfigureAwait(false);
+            if (managerSocket == null)
             {
                 Debug.Log("ERROR: could not find any suitable IPv4 address for '" + address + "'! Quitting...");
                 Application.Quit();
             }
-            IPEndPoint ipEndPoint = new IPEndPoint(hostIPAddress, port);
-            managerListener = new Socket(ipEndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
-            managerListener.Bind(ipEndPoint);
-            managerListener.Listen(1); // maximum queue length of 1, there should only be 1 remote manager
-            Debug.Log("Waiting for the agent to connect to address '" + hostIPAddress.ToString() + "'...");
-            managerSocket = managerListener.Accept();
             Debug.Log("Agent connection received!");
-            managerListener.Close();
 
-            on = true;
+            connected = true;
         }
 
         public void Close()
@@ -82,12 +70,12 @@ namespace Footsies
             managerSocket.Shutdown(SocketShutdown.Both);
             managerSocket.Close();
             
-            on = false;
+            connected = false;
         }
 
         public Command ProcessCommand()
         {
-            if (!on || !managerSocket.Connected || !(managerSocket.Available > 0))
+            if (!connected || !managerSocket.Connected || !(managerSocket.Available > 0))
                 return Command.NONE;
             
             List<byte> messageContent = new();
@@ -98,9 +86,15 @@ namespace Footsies
             Message message = JsonUtility.FromJson<Message>(messageJson);
 
             Command command = (Command) message.command;
-            if (command == Command.STATE_LOAD)
+            switch (command)
             {
-                battleState = JsonUtility.FromJson<BattleState>(message.value);
+                case Command.STATE_LOAD:
+                    battleState = JsonUtility.FromJson<BattleState>(message.value);
+                    break;
+                
+                case Command.P2_BOT:
+                    isP2Bot = message.value.ToLower() == "true";
+                    break;
             }
 
             return command;
@@ -111,18 +105,27 @@ namespace Footsies
             return battleState;
         }
 
+        public void SetP2Saved(TrainingActor p2)
+        {
+            p2Saved = p2;
+        }
+
+        public void SetP2Bot(TrainingBattleAIActor p2)
+        {
+            p2Bot = p2;
+        }
+
         public void SendBattleState(BattleState state)
         {
-            if (!on)
+            if (!connected)
                 return;
             
             string stateJson = JsonUtility.ToJson(state);
             byte[] stateBytes = Encoding.UTF8.GetBytes(stateJson);
 
+            Task<int> sendTask = SocketHelper.SendWithSizeSuffixAsync(managerSocket, stateBytes);
             if (syncedComms)
-                SocketHelper.SendWithSizeSuffix(managerSocket, stateBytes);
-            else
-                SocketHelper.SendWithSizeSuffixAsync(managerSocket, stateBytes);
+                sendTask.Wait();
         }
     }
 
