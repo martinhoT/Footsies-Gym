@@ -1,6 +1,6 @@
 import gymnasium as gym
 from gymnasium import spaces
-from ..moves import footsies_move_index_to_move, FootsiesMove
+from ..moves import FOOTSIES_MOVE_INDEX_TO_MOVE, FootsiesMove
 
 
 class FootsiesFrameSkipped(gym.Wrapper):
@@ -22,7 +22,7 @@ class FootsiesFrameSkipped(gym.Wrapper):
         self.observation_space = spaces.Dict(
             {
                 "guard": wrapped_observation_space["guard"],
-                "move": wrapped_observation_space["move"][1],
+                "move": wrapped_observation_space["move"],
                 "move_frame": spaces.Box(
                     low=move_frame_low, high=move_frame_high, shape=(1,)
                 ),
@@ -38,15 +38,15 @@ class FootsiesFrameSkipped(gym.Wrapper):
         """From the extracted observation data, transform it in case we are using frame skipping"""
         return {
             "guard": state_dict["guard"],
-            "move": state_dict["move"][1],
+            "move": state_dict["move"],
             "move_frame": state_dict["move_frame"][1],
             "position": state_dict["position"],
         }
 
     def _is_obs_skippable(self, state_dict: dict) -> bool:
         """From the extracted observation data, check whether the observation is skippable, i.e. the agent can't act on it"""
-        p1_move = footsies_move_index_to_move[state_dict["move"][0]]
-        p2_move = footsies_move_index_to_move[state_dict["move"][1]]
+        p1_move = FOOTSIES_MOVE_INDEX_TO_MOVE[state_dict["move"][0]]
+        p2_move = FOOTSIES_MOVE_INDEX_TO_MOVE[state_dict["move"][1]]
         hit_guard_moves = {FootsiesMove.DAMAGE, FootsiesMove.GUARD_STAND, FootsiesMove.GUARD_CROUCH, FootsiesMove.GUARD_M, FootsiesMove.GUARD_BREAK}
 
         return (

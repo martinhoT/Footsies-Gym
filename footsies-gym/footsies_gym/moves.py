@@ -23,5 +23,5 @@ class FootsiesMove(Enum):
     WIN = FootsiesMoveInfo(510, 33)
 
 # Helper structures to simplify move IDs (0, 1, 2, ...)
-footsies_move_index_to_move = list(FootsiesMove)
-footsies_move_id_to_index = {move.value.id: i for i, move in enumerate(footsies_move_index_to_move)}
+FOOTSIES_MOVE_INDEX_TO_MOVE = list(FootsiesMove)
+FOOTSIES_MOVE_ID_TO_INDEX = {move.value.id: i for i, move in enumerate(FOOTSIES_MOVE_INDEX_TO_MOVE)}

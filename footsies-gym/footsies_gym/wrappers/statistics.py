@@ -1,5 +1,5 @@
 import gymnasium as gym
-from ..moves import footsies_move_index_to_move, FootsiesMove
+from ..moves import FOOTSIES_MOVE_INDEX_TO_MOVE, FootsiesMove
 
 
 class FootsiesStatistics(gym.Wrapper):
@@ -15,7 +15,7 @@ class FootsiesStatistics(gym.Wrapper):
 
     def _get_p1_move(self, obs) -> FootsiesMove:
         p1_move_index = obs["move"][0]
-        return footsies_move_index_to_move[p1_move_index]
+        return FOOTSIES_MOVE_INDEX_TO_MOVE[p1_move_index]
 
     def reset(self, *, seed: int = None, options: dict = None):
         obs, info = self.env.reset(seed=seed, options=options)

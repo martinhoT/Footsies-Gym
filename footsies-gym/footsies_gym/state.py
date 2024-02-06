@@ -5,15 +5,15 @@ from typing import List
 
 @dataclasses.dataclass
 class FootsiesState:
-    """The environment state of FOOTSIES, obtained directly from the game"""
+    """The environment state of FOOTSIES, obtained directly from the game. Less general than `FootsiesBattleState`"""
 
     p1Vital: int
     p2Vital: int
     p1Guard: int
     p2Guard: int
     p1Move: int
-    p1MoveFrame: int
     p2Move: int
+    p1MoveFrame: int
     p2MoveFrame: int
     p1Position: float
     p2Position: float
@@ -31,6 +31,24 @@ class FootsiesState:
             (self.p2MostRecentAction & 1) != 0,
             (self.p2MostRecentAction & 2) != 0,
             (self.p2MostRecentAction & 4) != 0,
+        )
+
+    @staticmethod
+    def from_battle_state(battle_state: "FootsiesBattleState") -> "FootsiesState":
+        return FootsiesState(
+            p1Vital=battle_state.p1State.vitalHealth,
+            p2Vital=battle_state.p2State.vitalHealth,
+            p1Guard=battle_state.p1State.guardHealth,
+            p2Guard=battle_state.p2State.guardHealth,
+            p1Move=battle_state.p1State.currentActionID,
+            p2Move=battle_state.p2State.currentActionID,
+            p1MoveFrame=battle_state.p1State.currentActionFrame,
+            p2MoveFrame=battle_state.p2State.currentActionFrame,
+            p1Position=battle_state.p1State.position[0],
+            p2Position=battle_state.p2State.position[0],
+            globalFrame=battle_state.frameCount,
+            p1MostRecentAction=battle_state.p1State.input[0],
+            p2MostRecentAction=battle_state.p2State.input[0],
         )
 
     def __str__(self):

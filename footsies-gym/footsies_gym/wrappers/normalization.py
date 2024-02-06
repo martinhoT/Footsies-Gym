@@ -1,6 +1,6 @@
 import gymnasium as gym
 from gymnasium import spaces
-from ..moves import FootsiesMove, footsies_move_index_to_move
+from ..moves import FootsiesMove, FOOTSIES_MOVE_INDEX_TO_MOVE
 
 
 class FootsiesNormalized(gym.ObservationWrapper):
@@ -30,9 +30,9 @@ class FootsiesNormalized(gym.ObservationWrapper):
         obs["position"] = (obs["position"][0] / 4.4, obs["position"][1] / 4.4)
         obs["move_frame"] = (
             obs["move_frame"][0]
-            / footsies_move_index_to_move[int(obs["move"][0])].value.duration,
+            / FOOTSIES_MOVE_INDEX_TO_MOVE[int(obs["move"][0])].value.duration,
             obs["move_frame"][1]
-            / footsies_move_index_to_move[int(obs["move"][1])].value.duration
+            / FOOTSIES_MOVE_INDEX_TO_MOVE[int(obs["move"][1])].value.duration
         )
 
         return obs
@@ -44,9 +44,9 @@ class FootsiesNormalized(gym.ObservationWrapper):
         obs["position"] = (obs["position"][0] * 4.4, obs["position"][1] * 4.4)
         obs["move_frame"] = (
             obs["move_frame"][0]
-            * footsies_move_index_to_move[int(obs["move"][0])].value.duration,
+            * FOOTSIES_MOVE_INDEX_TO_MOVE[int(obs["move"][0])].value.duration,
             obs["move_frame"][1]
-            * footsies_move_index_to_move[int(obs["move"][1])].value.duration
+            * FOOTSIES_MOVE_INDEX_TO_MOVE[int(obs["move"][1])].value.duration
         )
 
         return obs

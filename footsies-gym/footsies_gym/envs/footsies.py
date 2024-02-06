@@ -10,7 +10,7 @@ from time import sleep, monotonic
 from enum import Enum
 from gymnasium import spaces
 from ..state import FootsiesState, FootsiesBattleState
-from ..moves import FootsiesMove, footsies_move_id_to_index
+from ..moves import FootsiesMove, FOOTSIES_MOVE_ID_TO_INDEX
 from .exceptions import FootsiesGameClosedError
 
 # TODO: move training agent input reading (through socket comms) to Update() instead of FixedUpdate()
@@ -346,8 +346,8 @@ class FootsiesEnv(gym.Env):
         return {
             "guard": (state.p1Guard, state.p2Guard),
             "move": (
-                footsies_move_id_to_index[state.p1Move],
-                footsies_move_id_to_index[state.p2Move],
+                FOOTSIES_MOVE_ID_TO_INDEX[state.p1Move],
+                FOOTSIES_MOVE_ID_TO_INDEX[state.p2Move],
             ),
             "move_frame": (p1_move_frame_simple, p2_move_frame_simple),
             "position": (state.p1Position, state.p2Position),
@@ -359,8 +359,8 @@ class FootsiesEnv(gym.Env):
             "frame": state.globalFrame,
             "p1_action": state.p1MostRecentAction,
             "p2_action": state.p2MostRecentAction,
-            "p1_move": footsies_move_id_to_index[state.p1Move],
-            "p2_move": footsies_move_id_to_index[state.p2Move],
+            "p1_move": FOOTSIES_MOVE_ID_TO_INDEX[state.p1Move],
+            "p2_move": FOOTSIES_MOVE_ID_TO_INDEX[state.p2Move],
         }
 
     def _get_sparse_reward(
