@@ -21,7 +21,7 @@ class FootsiesEnv(gym.Env):
     metadata = {"render_modes": "human", "render_fps": 60}
     
     STATE_MESSAGE_SIZE_BYTES = 4
-    COMM_TIMEOUT = 3.0
+    COMM_TIMEOUT = None
 
     class RemoteControlCommand(Enum):
         NONE = 0
@@ -39,7 +39,7 @@ class FootsiesEnv(gym.Env):
         game_port: int = 11000,
         skip_instancing: bool = False,
         fast_forward: bool = True,
-        sync_mode: str = "synced_blocking",
+        sync_mode: str = "synced_non_blocking",
         remote_control_port: int = 11002,
         by_example: bool = False,
         opponent: Callable[[dict], Tuple[bool, bool, bool]] = None,
@@ -72,7 +72,7 @@ class FootsiesEnv(gym.Env):
             one of "async", "synced_non_blocking" or "synced_blocking":
             - "async": process the game without making sure the agents have provided inputs. Doesn't make much sense to have `fast_forward` enabled as well. Due to non-blocking communications, input may only be received every other frame, slowing down game interaction speed to half
             - "synced_non_blocking": at every time step, the game will wait for all agents' inputs before proceeding. Communications are non-blocking, and as such may have the same problem as above
-            - "synced_blocking": similar to above, but communications are blocking. If using human `render_mode`, the game may have frozen rendering
+            - "synced_blocking": similar to above, but communications are blocking. If using human `render_mode`, the game may have frozen rendering. Remote control is not supported in this mode
             
         remote_control_port: int
             the port to which the remote control socket will connect to
@@ -389,7 +389,16 @@ class FootsiesEnv(gym.Env):
         return reward
 
     def _remote_control_send_command(self, command: RemoteControlCommand, value: str = "") -> "any":
-        """Send a command to the game"""
+        """
+        Send a command to the game.
+            
+        WARNING: this method is not supported if the environment is in `synced_blocking` mode,
+        since the game will be most of the time waiting for the agent to send an action rather
+        than waiting for a command.
+        """
+        if self.sync_mode == "synced_blocking":
+            raise RuntimeError("remote control is not supported in 'synced_blocking' mode")
+            
         if command == self.RemoteControlCommand.NONE:
             return
         
