@@ -21,7 +21,7 @@ class FootsiesEnv(gym.Env):
     metadata = {"render_modes": "human", "render_fps": 60}
     
     STATE_MESSAGE_SIZE_BYTES = 4
-    COMM_TIMEOUT = None
+    COMM_TIMEOUT = 10
 
     class RemoteControlCommand(Enum):
         NONE = 0
@@ -151,14 +151,14 @@ class FootsiesEnv(gym.Env):
         # The observation space is divided into 2 columns, the first for player 1 (the agent) and the second for player 2
         self.observation_space = spaces.Dict(
             {
-                "guard": spaces.Box(low=0.0, high=3.0, shape=(2,)),  # 0..3
+                "guard": spaces.MultiDiscrete([4, 4]),  # 0..3
                 "move": spaces.MultiDiscrete(
                     [len(relevant_moves), len(relevant_moves)]
                 ),
                 "move_frame": spaces.Box(
                     low=0.0, high=maximum_move_duration, shape=(2,)
                 ),
-                "position": spaces.Box(low=-4.4, high=4.4, shape=(2,)),
+                "position": spaces.Box(low=-4.6, high=4.6, shape=(2,)),
             }
         )
 
@@ -174,7 +174,7 @@ class FootsiesEnv(gym.Env):
 
         # The latest observation that the agent saw
         # Required in order to communicate to the opponent the same observation
-        self._last_passed_observation = None
+        self._most_recent_observation = None
 
         # Keep track of the total reward during this episode
         # Only used when dense rewards are enabled
@@ -353,14 +353,14 @@ class FootsiesEnv(gym.Env):
             "position": (state.p1Position, state.p2Position),
         }
 
-    def _extract_info(self, state: FootsiesState) -> dict:
+    def _extract_info(self, state: FootsiesState, obs: dict) -> dict:
         """Get the current additional info from the environment state"""
         return {
             "frame": state.globalFrame,
             "p1_action": state.p1MostRecentAction,
             "p2_action": state.p2MostRecentAction,
-            "p1_move": FOOTSIES_MOVE_ID_TO_INDEX[state.p1Move],
-            "p2_move": FOOTSIES_MOVE_ID_TO_INDEX[state.p2Move],
+            # Put a copy of the observation in the information dict, so that it's preserved through the wrappers
+            **obs
         }
 
     def _get_sparse_reward(
@@ -475,8 +475,8 @@ class FootsiesEnv(gym.Env):
 
         obs = self._extract_obs(first_state)
         # Create a copy of this observation (make sure it's not edited because 'obs' was changed afterwards, which may happen with wrappers)
-        self._last_passed_observation = obs.copy()
-        return obs, self._extract_info(first_state)
+        self._most_recent_observation = obs.copy()
+        return obs, self._extract_info(first_state, obs)
 
     # Step already assumes that the queue of delayed frames is full from reset()
     def step(
@@ -487,7 +487,7 @@ class FootsiesEnv(gym.Env):
             self._send_action(action, is_opponent=False)
 
         if self.opponent is not None:
-            opponent_action = self.opponent(self._last_passed_observation)
+            opponent_action = self.opponent(self._most_recent_observation)
             self._send_action(opponent_action, is_opponent=True)
 
         # Save the state before the environment step for later
@@ -514,7 +514,7 @@ class FootsiesEnv(gym.Env):
 
         # Get next observation, info and reward
         obs = self._extract_obs(state)
-        info = self._extract_info(state)
+        info = self._extract_info(state, obs)
 
         terminated = most_recent_state.p1Vital == 0 or most_recent_state.p2Vital == 0
         reward = (
@@ -527,7 +527,7 @@ class FootsiesEnv(gym.Env):
         self.has_terminated = terminated
 
         # Create a copy of this observation, as is done in reset()
-        self._last_passed_observation = obs.copy()
+        self._most_recent_observation = obs.copy()
 
         # Environment is never truncated
         return obs, reward, terminated, False, info
@@ -539,6 +539,11 @@ class FootsiesEnv(gym.Env):
             self.opponent_comm.close()
         if self._game_instance is not None:
             self._game_instance.kill()  # just making sure the game is closed
+
+    @property
+    def most_recent_observation(self) -> dict:
+        """The most recent observation received by the environment after `reset` or `step`."""
+        return self._most_recent_observation
 
 
 if __name__ == "__main__":
