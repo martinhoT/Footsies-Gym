@@ -77,7 +77,7 @@ class FootsiesEnv(gym.Env):
         remote_control_port: int
             the port to which the remote control socket will connect to
         by_example: bool
-            whether to simply observe another autonomous player play the game. Actions passed in `step()` are ignored
+            whether to simply observe the in-game bot play the game. Actions passed in `step()` are ignored
         opponent: Callable[[dict], Tuple[bool, bool, bool]]
             if not `None`, it's the policy to be followed by the agent's opponent. It's recommended that the environment is `synced` if a policy is supplied, since both the agent and the opponent will be acting at the same time
         opponent_port: int

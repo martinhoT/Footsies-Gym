@@ -1,7 +1,13 @@
 from enum import Enum
-from collections import namedtuple
+from dataclasses import dataclass
 
-FootsiesMoveInfo = namedtuple("FootsiesMoveInfo", ["id", "duration", "startup", "active", "recovery"])
+@dataclass
+class FootsiesMoveInfo:
+    id:         int
+    duration:   int
+    startup:    int
+    active:     int
+    recovery:   int
 
 class FootsiesMove(Enum):
     STAND = FootsiesMoveInfo(0, 24, 0, 0, 0)
