@@ -9,6 +9,7 @@ def get_dict_obs_from_vector_obs(
     flattened: bool = True,
     unflattenend_observation_space: Space = None,
     normalized: bool = True,
+    normalized_guard: bool = True,
 ) -> dict:
     """
     Convert a FOOTSIES observation from a transformed version (with observation wrappers) into the original version.
@@ -34,6 +35,6 @@ def get_dict_obs_from_vector_obs(
         )
 
     if normalized:
-        dict_obs = FootsiesNormalized.undo(dict_obs)
+        dict_obs = FootsiesNormalized.undo(dict_obs, normalized_guard=normalized_guard)
 
     return dict_obs

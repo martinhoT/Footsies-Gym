@@ -40,9 +40,9 @@ class FootsiesNormalized(gym.ObservationWrapper):
         return obs
 
     @staticmethod
-    def undo(obs: dict) -> dict:
+    def undo(obs: dict, normalized_guard: bool = True) -> dict:
         obs = obs.copy()
-        if self.normalize_guard:
+        if normalized_guard:
             obs["guard"] = (obs["guard"][0] * 3.0, obs["guard"][1] * 3.0)
         obs["position"] = (obs["position"][0] * 4.6, obs["position"][1] * 4.6)
         obs["move_frame"] = (
