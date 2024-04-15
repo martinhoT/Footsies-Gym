@@ -74,7 +74,6 @@ namespace Footsies
             string stateJson = JsonUtility.ToJson(state);
             byte[] stateBytes = Encoding.UTF8.GetBytes(stateJson);
 
-            Debug.Log("Sending the game's current state (frame: " + state.globalFrame + ")");
             stateRequest = SocketHelper.SendWithSizeSuffixAsync(trainingSocket, stateBytes);
             if (syncedComms)
                 stateRequest.Wait();

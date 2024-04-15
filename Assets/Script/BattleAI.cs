@@ -1,6 +1,8 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using Random = UnityEngine.Random;
 
 namespace Footsies
 {
@@ -383,6 +385,13 @@ namespace Footsies
         private int GetBackwardInput()
         {
             return (int) (this.isPlayer1 ? InputDefine.Left : InputDefine.Right);
+        }
+
+        public void Reset()
+        {
+            moveQueue.Clear();
+            attackQueue.Clear();
+            Array.Clear(fightStates, 0, fightStates.Length);
         }
 
     }

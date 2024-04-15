@@ -22,6 +22,7 @@ namespace Footsies
             STATE_SAVE = 2,
             STATE_LOAD = 3,
             P2_BOT = 4,
+            SEED = 5,
         }
 
         [Serializable]
@@ -39,6 +40,7 @@ namespace Footsies
         public TrainingActor p2Saved { get; private set; }
         public TrainingBattleAIActor p2Bot { get; private set; }
         public bool isP2Bot { get; private set; }
+        public int seed { get; private set; }
 
         private Socket managerSocket;
 
@@ -94,6 +96,10 @@ namespace Footsies
                 
                 case Command.P2_BOT:
                     isP2Bot = message.value.ToLower() == "true";
+                    break;
+                
+                case Command.SEED:
+                    seed = int.Parse(message.value);
                     break;
             }
 
