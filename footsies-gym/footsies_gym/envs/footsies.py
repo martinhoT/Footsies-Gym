@@ -5,7 +5,7 @@ import subprocess
 import struct
 import gymnasium as gym
 from os import path
-from typing import Callable, Tuple
+from typing import Callable, Tuple, Dict, Union
 from time import sleep, monotonic
 from enum import Enum
 from gymnasium import spaces
@@ -43,7 +43,7 @@ class FootsiesEnv(gym.Env):
         sync_mode: str = "synced_non_blocking",
         remote_control_port: int = 11002,
         by_example: bool = False,
-        opponent: Callable[[dict], Tuple[bool, bool, bool]] = None,
+        opponent: Callable[[dict, dict], Tuple[bool, bool, bool]] = None,
         opponent_port: int = 11001,
         vs_player: bool = False,
         dense_reward: bool = True,
@@ -79,7 +79,7 @@ class FootsiesEnv(gym.Env):
             the port to which the remote control socket will connect to
         by_example: bool
             whether to simply observe the in-game bot play the game. Actions passed in `step()` are ignored
-        opponent: Callable[[dict], Tuple[bool, bool, bool]]
+        opponent: Callable[[dict, dict, bool, bool], Tuple[bool, bool, bool]]
             if not `None`, it's the policy to be followed by the agent's opponent. It's recommended that the environment is `synced` if a policy is supplied, since both the agent and the opponent will be acting at the same time
         opponent_port: int
             if an opponent policy is supplied, then this is the game's port to which the opponent's actions are sent
@@ -173,9 +173,10 @@ class FootsiesEnv(gym.Env):
         # Useful to differentiate between the previous and current environment state
         self._current_state = None
 
-        # The latest observation that the agent saw
-        # Required in order to communicate to the opponent the same observation
+        # The latest observation and info that the agent saw
+        # Required in order to communicate to the opponent the same observation and info
         self._most_recent_observation = None
+        self._most_recent_info = None
 
         # Keep track of the total reward during this episode
         # Only used when dense rewards are enabled
@@ -416,10 +417,16 @@ class FootsiesEnv(gym.Env):
 
     def save_battle_state(self) -> FootsiesBattleState:
         """Save the current game state"""
+        self._instantiate_game()
+        self._connect_to_game()
+    
         return self._remote_control_send_command(self.RemoteControlCommand.STATE_SAVE)
 
     def load_battle_state(self, battle_state: FootsiesBattleState):
         """Make the game load a specific battle state"""
+        self._instantiate_game()
+        self._connect_to_game()
+    
         self._remote_control_send_command(self.RemoteControlCommand.STATE_LOAD, battle_state.json())
 
     def _request_reset(self):
@@ -441,6 +448,9 @@ class FootsiesEnv(gym.Env):
 
         WARNING: the environment needs to be set up with a custom opponent on creation (may be a dummy one), or else this method will raise an exception.
         """
+        self._instantiate_game()
+        self._connect_to_game()
+
         # TODO: maybe try making this not a requirement
         if self.opponent_comm is None:
             raise RuntimeError("the environment needs to be created with a custom opponent before calling this method")
@@ -484,9 +494,11 @@ class FootsiesEnv(gym.Env):
         self.has_terminated = False
 
         obs = self._extract_obs(first_state)
+        info = self._extract_info(first_state, obs)
         # Create a copy of this observation (make sure it's not edited because 'obs' was changed afterwards, which may happen with wrappers)
         self._most_recent_observation = obs.copy()
-        return obs, self._extract_info(first_state, obs)
+        self._most_recent_info = info.copy()
+        return obs, info
 
     # Step already assumes that the queue of delayed frames is full from reset()
     def step(
@@ -497,7 +509,7 @@ class FootsiesEnv(gym.Env):
             self._send_action(action, is_opponent=False)
 
         if self.opponent is not None:
-            opponent_action = self.opponent(self._most_recent_observation)
+            opponent_action = self.opponent(self._most_recent_observation, self._most_recent_info)
             self._send_action(opponent_action, is_opponent=True)
 
         # Save the state before the environment step for later
@@ -533,11 +545,12 @@ class FootsiesEnv(gym.Env):
             else self._get_sparse_reward(previous_state, most_recent_state, terminated)
         )
 
-        # Enable reset() without needing hard_reset() if episode terminated normally on this step
+        # Enable reset() without requesting a forceful reset if episode terminated normally on this step
         self.has_terminated = terminated
 
-        # Create a copy of this observation, as is done in reset()
+        # Create a copy of this observation and info, as is done in reset()
         self._most_recent_observation = obs.copy()
+        self._most_recent_info = info.copy()
 
         # Environment is never truncated
         return obs, reward, terminated, False, info
@@ -554,6 +567,37 @@ class FootsiesEnv(gym.Env):
     def most_recent_observation(self) -> dict:
         """The most recent observation received by the environment after `reset` or `step`."""
         return self._most_recent_observation
+
+    @property
+    def most_recent_info(self) -> dict:
+        """The most recent info received by the environment after `reset` or `step`."""
+        return self._most_recent_info
+    
+    @staticmethod
+    def find_ports(start: int, step: int = 1, stop: Union[int, None] = None) -> Dict[str, int]:
+        """Find available ports for a new instance of `FootsiesEnv`. The `psutil` module is required."""
+        import psutil
+        from itertools import count
+    
+        closed_ports = {p.laddr.port for p in psutil.net_connections(kind="tcp4")}
+        port_iterator = count(start=start, step=step) if stop is None else range(start, stop, step)
+        ports = []
+
+        for port in port_iterator:
+            if port not in closed_ports:
+                ports.append(port)
+
+            if len(ports) >= 3:
+                break
+
+        if len(ports) < 3:
+            raise RuntimeError(f"could not find 3 free ports for a new FOOTSIES instance (starting at {start} with steps of {step} until {stop})")
+
+        return {
+            "game_port": ports[0],
+            "opponent_port": ports[1],
+            "remote_control_port": ports[2],
+        }
 
 
 if __name__ == "__main__":
