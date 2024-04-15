@@ -142,7 +142,7 @@ namespace Footsies
             {
                 case TrainingRemoteControl.Command.RESET:
                     Debug.Log("Received RESET command");
-                    ChangeRoundState(RoundStateType.Intro);
+                    ChangeRoundState(RoundStateType.Stop);
                     break;
 
                 case TrainingRemoteControl.Command.STATE_SAVE:
@@ -181,12 +181,6 @@ namespace Footsies
 
                     break;
                 case RoundStateType.Intro:
-
-                    if (trainingManager.actorP1 is TrainingBattleAIActor)
-                        GameManager.Instance.botP1.GetAI().Reset();
-                    if (trainingManager.actorP2 is TrainingBattleAIActor)
-                        GameManager.Instance.botP2.GetAI().Reset();
-                    battleAI?.Reset();
 
                     UpdateIntroState();
 
@@ -276,6 +270,12 @@ namespace Footsies
 
                     if (GameManager.Instance.isVsCPU)
                         battleAI = new BattleAI(this, false);
+
+                    if (trainingManager.actorP1 is TrainingBattleAIActor)
+                        GameManager.Instance.botP1.GetAI().Reset();
+                    if (trainingManager.actorP2 is TrainingBattleAIActor)
+                        GameManager.Instance.botP2.GetAI().Reset();
+                    battleAI?.Reset();
 
                     break;
                 case RoundStateType.Fight:

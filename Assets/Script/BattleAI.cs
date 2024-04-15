@@ -387,11 +387,19 @@ namespace Footsies
             return (int) (this.isPlayer1 ? InputDefine.Left : InputDefine.Right);
         }
 
+        // This method exists primarily to properly set the initial state of battleAIs during training.
+        // TrainingBattleAIActors will keep the move and attack queues if we don't reset,
+        // and since the intro sequence is skipped the fightStates array will not be properly filled.
         public void Reset()
         {
+            // Don't keep moves between rounds.
             moveQueue.Clear();
             attackQueue.Clear();
-            Array.Clear(fightStates, 0, fightStates.Length);
+            
+            // In order for the BattleAI to correctly have the fightStates array filled,
+            // we need to manually perform the filling before a fight.
+            UpdateFightState();
+            Array.Fill(fightStates, fightStates[0]);
         }
 
     }
