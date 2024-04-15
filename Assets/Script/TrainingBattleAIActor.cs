@@ -17,6 +17,10 @@ namespace Footsies
             battleAI = ai;
         }
 
+        public BattleAI GetAI() {
+            return battleAI;
+        }
+
         public Task Setup() { return Task.CompletedTask; }
 
         public void Close() {}

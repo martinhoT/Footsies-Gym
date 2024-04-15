@@ -29,6 +29,7 @@ class FootsiesEnv(gym.Env):
         STATE_SAVE = 2
         STATE_LOAD = 3
         P2_BOT = 4
+        SEED = 5
 
     def __init__(
         self,
@@ -429,6 +430,10 @@ class FootsiesEnv(gym.Env):
         """Request that the game changes player 2 to be either the in-game bot or a remote opponent"""
         self._remote_control_send_command(self.RemoteControlCommand.P2_BOT, str(bot))
 
+    def _request_seed_set(self, seed: int):
+        """Request the game to set its random number generator seed to the specified value"""
+        self._remote_control_send_command(self.RemoteControlCommand.SEED, str(seed))
+
     def set_opponent(self, opponent: Callable[[dict], Tuple[bool, bool, bool]]):
         """
         Set the agent's opponent to the specified custom policy, or `None` if the default environment opponent should be used.
@@ -451,14 +456,19 @@ class FootsiesEnv(gym.Env):
             self._request_opponent_change(bot=self.opponent is None)
 
     def reset(self, *, seed: int = None, options: dict = None) -> "tuple[dict, dict]":
+        super().reset(seed=seed)
+        self._instantiate_game()
+        self._connect_to_game()
+
+        if seed is not None:
+            self._request_seed_set(seed)
+
         if not self.has_terminated:
             self._request_reset()
         
         self.delayed_frame_queue.clear()
         self._cummulative_episode_reward = 0.0
 
-        self._instantiate_game()
-        self._connect_to_game()
         first_state = self._receive_and_update_state()
         # Guarantee it's the first environment state
         while first_state.globalFrame != -1:
@@ -559,7 +569,6 @@ if __name__ == "__main__":
         log_file_overwrite=True,
         frame_delay=0,
         skip_instancing=False,
-        opponent=lambda d: (False, False, False),
     )
 
     # Keep track of how many frames/steps were processed each second so that we can adjust how fast the game runs
@@ -578,10 +587,10 @@ if __name__ == "__main__":
     try:
         while True:
             terminated, truncated = False, False
-            observation, info = env.reset()
+            observation, info = env.reset(seed=0)
             while not (terminated or truncated):
                 time_current = monotonic()  # for fps tracking
-                action = env.action_space.sample()
+                action = (False, False, False) # env.action_space.sample()
                 next_observation, reward, terminated, truncated, info = env.step(action)
 
                 frames = (frames * fps_counter_decay) + 1
@@ -608,8 +617,8 @@ if __name__ == "__main__":
                     env.set_opponent((lambda d: (False, False, False)) if use_custom_opponent else None)
                     use_custom_opponent = not use_custom_opponent
 
-                # action_to_string = lambda t: " ".join(("O" if a else " ") for a in t)
-                # print(f"P1: {action_to_string(info['p1_action']):} | P2: {action_to_string(info['p2_action'])}")
+                action_to_string = lambda t: " ".join(("O" if a else " ") for a in t)
+                print(f"P1: {action_to_string(info['p1_action']):} | P2: {action_to_string(info['p2_action'])}")
             episode_counter += 1
 
     except KeyboardInterrupt:

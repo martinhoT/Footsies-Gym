@@ -166,6 +166,11 @@ namespace Footsies
                         trainingManager.actorP2 = trainingRemoteControl.p2Saved;
                     }
                     break;
+                
+                case TrainingRemoteControl.Command.SEED:
+                    Debug.Log("Setting random seed to " + trainingRemoteControl.seed.ToString());
+                    Random.InitState(trainingRemoteControl.seed);
+                    break;
             }
 
             switch(_roundState)
@@ -176,6 +181,12 @@ namespace Footsies
 
                     break;
                 case RoundStateType.Intro:
+
+                    if (trainingManager.actorP1 is TrainingBattleAIActor)
+                        GameManager.Instance.botP1.GetAI().Reset();
+                    if (trainingManager.actorP2 is TrainingBattleAIActor)
+                        GameManager.Instance.botP2.GetAI().Reset();
+                    battleAI?.Reset();
 
                     UpdateIntroState();
 

@@ -57,7 +57,6 @@ namespace Footsies
                 string stateJson = JsonUtility.ToJson(state);
                 byte[] stateBytes = Encoding.UTF8.GetBytes(stateJson);
 
-                Debug.Log("Sending the game's current state (frame: " + state.globalFrame + ")");
                 stateRequest = SocketHelper.SendWithSizeSuffixAsync(trainingSocket, stateBytes);
                 if (syncedComms)
                     stateRequest.Wait();
@@ -96,11 +95,9 @@ namespace Footsies
             byte[] actionMessageContent = {0, 0, 0};
             ArraySegment<byte> actionMessage = new(actionMessageContent);
 
-            Debug.Log("Waiting for the agent's action...");
             // Corrected implementation of ReceiveAsync with a cancellation token... (https://github.com/mono/mono/issues/20902)
             var receiveTask = trainingSocket.ReceiveAsync(actionMessage, SocketFlags.None);
             int bytesReceived = await receiveTask.ConfigureAwait(false);
-            Debug.Log("Agent action received! (" + (int)actionMessageContent[0] + ", " + (int)actionMessageContent[1] + ", " + (int)actionMessageContent[2] + ")");
 
             // EOF has been reached, communication has likely been stopped on the agent's side
             if (bytesReceived == 0)
