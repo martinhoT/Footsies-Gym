@@ -71,7 +71,7 @@ class FootsiesState:
 - P2 most recent action: {self.p2MostRecentAction}"""
     
 
-@dataclasses.dataclass
+@dataclasses.dataclass(slots=True)
 class FootsiesBattleState:
     """The full state of FOOTSIES at a particular time step, meant for saving/loading game states"""
     
@@ -96,11 +96,11 @@ class FootsiesBattleState:
         return json.dumps(dataclasses.asdict(self))
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(slots=True)
 class FootsiesFighterState:
     """The full state of one player of FOOTSIES at a particular time step, meant for saving/loading game states"""
 
-    position:       List[int]
+    position:       List[float]
     velocity_x:     float
     isFaceRight:    bool
 

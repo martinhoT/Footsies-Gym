@@ -34,7 +34,7 @@ class FootsiesEnv(gym.Env):
     def __init__(
         self,
         frame_delay: int = 0,
-        render_mode: str = None,
+        render_mode: str | None = None,
         game_path: str = "./Build/FOOTSIES",
         game_address: str = "localhost",
         game_port: int = 11000,
@@ -43,7 +43,7 @@ class FootsiesEnv(gym.Env):
         sync_mode: str = "synced_non_blocking",
         remote_control_port: int = 11002,
         by_example: bool = False,
-        opponent: Callable[[dict, dict], Tuple[bool, bool, bool]] = None,
+        opponent: Callable[[dict, dict], Tuple[bool, bool, bool]] | None = None,
         opponent_port: int = 11001,
         vs_player: bool = False,
         dense_reward: bool = True,
@@ -441,7 +441,7 @@ class FootsiesEnv(gym.Env):
         """Request the game to set its random number generator seed to the specified value"""
         self._remote_control_send_command(self.RemoteControlCommand.SEED, str(seed))
 
-    def set_opponent(self, opponent: Callable[[dict], Tuple[bool, bool, bool]]):
+    def set_opponent(self, opponent: Callable[[dict, dict], Tuple[bool, bool, bool]] | None):
         """
         Set the agent's opponent to the specified custom policy, or `None` if the default environment opponent should be used.
         Returns whether the environment requires calling `reset(...)` after calling this method.

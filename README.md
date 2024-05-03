@@ -60,6 +60,8 @@ If binary releases aren't available for your platform, the game has to be built 
 
 The `footsies_gym` folder is not part of the game's project. This folder contains the Gymnasium environment which allows interaction with the game using Python.
 
+**The project is still a work-in-progress, and the documentation may be outdated.**
+
 ### Installation
 
 The environment was only tested for Python versions +3.8.10.
