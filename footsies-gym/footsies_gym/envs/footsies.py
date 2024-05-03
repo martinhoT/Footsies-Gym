@@ -40,6 +40,7 @@ class FootsiesEnv(gym.Env):
         game_port: int = 11000,
         skip_instancing: bool = False,
         fast_forward: bool = True,
+        fast_forward_speed: float = 6.0,
         sync_mode: str = "synced_non_blocking",
         remote_control_port: int = 11002,
         by_example: bool = False,
@@ -69,6 +70,8 @@ class FootsiesEnv(gym.Env):
             whether to skip instancing of the game
         fast_forward: bool
             whether to run the game at a much faster rate than normal
+        fast_forward_speed: float
+            the speed at which the game should run when fast-forwarding, as a multiplier of the base value (50 updates per second). Doesn't make much sense to use values lower than 1.0
         sync_mode: str
             one of "async", "synced_non_blocking" or "synced_blocking":
             - "async": process the game without making sure the agents have provided inputs. Doesn't make much sense to have `fast_forward` enabled as well. Due to non-blocking communications, input may only be received every other frame, slowing down game interaction speed to half
@@ -109,6 +112,7 @@ class FootsiesEnv(gym.Env):
         self.game_port = game_port
         self.skip_instancing = skip_instancing
         self.fast_forward = fast_forward
+        self.fast_forward_speed = fast_forward_speed
         self.sync_mode = sync_mode
         self.remote_control_port = remote_control_port
         self.by_example = by_example
@@ -211,7 +215,11 @@ class FootsiesEnv(gym.Env):
             if self.render_mode is None:
                 args.extend(["-batchmode", "-nographics"])
             if self.fast_forward:
-                args.append("--fast-forward")
+                args.extend([
+                    "--fast-forward",
+                    "--fast-forward-speed",
+                    str(self.fast_forward_speed),
+                ])
             
             if self.sync_mode == "synced_non_blocking":
                 args.append("--synced-non-blocking")
@@ -608,7 +616,8 @@ if __name__ == "__main__":
         render_mode="human",
         sync_mode="synced_non_blocking",
         vs_player=False,
-        fast_forward=False,
+        fast_forward=True,
+        fast_forward_speed=6.0,
         log_file="out.log",
         log_file_overwrite=True,
         frame_delay=0,
@@ -645,24 +654,24 @@ if __name__ == "__main__":
                     end="\r",
                 )
 
-                ipt = input("What to do? (s: save | l: load | r: reset | o: toggle opponent)\n")
-                if ipt == "s":
-                    battle_state = env.save_battle_state()
-                    pprint.pprint(battle_state, depth=2, indent=1)
-                elif ipt == "l":
-                    if battle_state is None:
-                        print("No battle state has been saved")
-                    else:
-                        env.load_battle_state(battle_state)
-                elif ipt == "r":
-                    # Force reset() to be called again
-                    truncated = True
-                elif ipt == "o":
-                    env.set_opponent((lambda d: (False, False, False)) if use_custom_opponent else None)
-                    use_custom_opponent = not use_custom_opponent
+                # ipt = input("What to do? (s: save | l: load | r: reset | o: toggle opponent)\n")
+                # if ipt == "s":
+                #     battle_state = env.save_battle_state()
+                #     pprint.pprint(battle_state, depth=2, indent=1)
+                # elif ipt == "l":
+                #     if battle_state is None:
+                #         print("No battle state has been saved")
+                #     else:
+                #         env.load_battle_state(battle_state)
+                # elif ipt == "r":
+                #     # Force reset() to be called again
+                #     truncated = True
+                # elif ipt == "o":
+                #     env.set_opponent((lambda d: (False, False, False)) if use_custom_opponent else None)
+                #     use_custom_opponent = not use_custom_opponent
 
-                action_to_string = lambda t: " ".join(("O" if a else " ") for a in t)
-                print(f"P1: {action_to_string(info['p1_action']):} | P2: {action_to_string(info['p2_action'])}")
+                # action_to_string = lambda t: " ".join(("O" if a else " ") for a in t)
+                # print(f"P1: {action_to_string(info['p1_action']):} | P2: {action_to_string(info['p2_action'])}")
             episode_counter += 1
 
     except KeyboardInterrupt:

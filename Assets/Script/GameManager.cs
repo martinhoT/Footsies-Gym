@@ -33,8 +33,6 @@ namespace Footsies
         {
             DontDestroyOnLoad(this.gameObject);
 
-            Application.targetFrameRate = 60;
-
             string[] args = Environment.GetCommandLineArgs();
             string passedArguments = "";
             // Default values
@@ -55,6 +53,7 @@ namespace Footsies
             int argP2TrainingPort = 11001;
             bool argP2NoState = false;
             bool argFastForward = false;
+            float argFastForwardSpeed = 6.0f;
             
             int argIndex = 0;
             foreach (var arg in args)
@@ -69,6 +68,10 @@ namespace Footsies
 
                     case "--fast-forward":
                         argFastForward = true;
+                        break;
+                    
+                    case "--fast-forward-speed":
+                        argFastForwardSpeed = Convert.ToSingle(args[argIndex + 1]);
                         break;
                     
                     case "--synced-non-blocking":
@@ -171,9 +174,8 @@ namespace Footsies
 
             if (argIsTrainingEnv && argFastForward)
             {
-                // Make the game run 100x faster for more efficient training
-                Time.timeScale = 100;
-                Application.targetFrameRate = 5000;
+                // Make the game run 6x faster (by default) for more efficient training
+                Time.timeScale = argFastForwardSpeed;
             }
 
             if (argP1Bot)
