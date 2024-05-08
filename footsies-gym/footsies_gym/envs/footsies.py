@@ -48,7 +48,7 @@ class FootsiesEnv(gym.Env):
         opponent_port: int = 11001,
         vs_player: bool = False,
         dense_reward: bool = True,
-        log_file: str = None,
+        log_file: str | None = None,
         log_file_overwrite: bool = False,
     ):
         """
@@ -211,6 +211,7 @@ class FootsiesEnv(gym.Env):
                 self.game_address,
                 "--remote-control-port",
                 str(self.remote_control_port),
+                "-force-gfx-direct", # force single threaded rendering
             ]
             if self.render_mode is None:
                 args.extend(["-batchmode", "-nographics"])

@@ -33,6 +33,8 @@ namespace Footsies
         {
             DontDestroyOnLoad(this.gameObject);
 
+            Application.targetFrameRate = 60;
+
             string[] args = Environment.GetCommandLineArgs();
             string passedArguments = "";
             // Default values
@@ -176,6 +178,7 @@ namespace Footsies
             {
                 // Make the game run 6x faster (by default) for more efficient training
                 Time.timeScale = argFastForwardSpeed;
+                Application.targetFrameRate = Convert.ToInt32(argFastForwardSpeed / Time.fixedDeltaTime);
             }
 
             if (argP1Bot)
