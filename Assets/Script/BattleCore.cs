@@ -461,7 +461,9 @@ namespace Footsies
                 fighter2.position.x, // p2Position
                 frameCount, // globalFrame
                 (currentRecordingInputIndex > 0) ? recordingP1Input[currentRecordingInputIndex - 1].input : 0, // p1MostRecentAction
-                (currentRecordingInputIndex > 0) ? recordingP2Input[currentRecordingInputIndex - 1].input : 0 // p2MostRecentAction
+                (currentRecordingInputIndex > 0) ? recordingP2Input[currentRecordingInputIndex - 1].input : 0, // p2MostRecentAction
+                fighter1.currentHitStunFrame, // p1Hitstun
+                fighter2.currentHitStunFrame // p2Hitstun
             );
         }
 

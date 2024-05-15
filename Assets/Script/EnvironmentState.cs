@@ -22,8 +22,10 @@ namespace Footsies
         public int globalFrame;
         public int p1MostRecentAction;
         public int p2MostRecentAction;
+        public int p1Hitstun;
+        public int p2Hitstun;
 
-        public EnvironmentState(int p1Vital_, int p2Vital_, int p1Guard_, int p2Guard_, int p1Move_, int p1MoveFrame_, int p2Move_, int p2MoveFrame_, float p1Position_, float p2Position_, int globalFrame_, int p1MostRecentAction_, int p2MostRecentAction_)
+        public EnvironmentState(int p1Vital_, int p2Vital_, int p1Guard_, int p2Guard_, int p1Move_, int p1MoveFrame_, int p2Move_, int p2MoveFrame_, float p1Position_, float p2Position_, int globalFrame_, int p1MostRecentAction_, int p2MostRecentAction_, int p1Hitstun_, int p2Hitstun_)
         {
             p1Vital = p1Vital_;
             p2Vital = p2Vital_;
@@ -38,6 +40,8 @@ namespace Footsies
             globalFrame = globalFrame_;
             p1MostRecentAction = p1MostRecentAction_;
             p2MostRecentAction = p2MostRecentAction_;
+            p1Hitstun = p1Hitstun_;
+            p2Hitstun = p2Hitstun_;
         }
     }
 }

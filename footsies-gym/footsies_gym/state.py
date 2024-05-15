@@ -20,6 +20,8 @@ class FootsiesState:
     globalFrame: int
     p1MostRecentAction: "tuple[bool, bool, bool]"
     p2MostRecentAction: "tuple[bool, bool, bool]"
+    p1Hitstun: int
+    p2Hitstun: int
 
     def __post_init__(self):
         self.p1MostRecentAction = (
@@ -49,6 +51,8 @@ class FootsiesState:
             globalFrame=battle_state.frameCount,
             p1MostRecentAction=battle_state.p1State.input[0],
             p2MostRecentAction=battle_state.p2State.input[0],
+            p1Hitstun=battle_state.p1State.currentHitStunFrame,
+            p2Hitstun=battle_state.p2State.currentHitStunFrame,
         )
 
     def __str__(self):

@@ -370,6 +370,8 @@ class FootsiesEnv(gym.Env):
             "frame": state.globalFrame,
             "p1_action": state.p1MostRecentAction,
             "p2_action": state.p2MostRecentAction,
+            "p1_hitstun": state.p1Hitstun,
+            "p2_hitstun": state.p2Hitstun,
             # Put a copy of the observation in the information dict, so that it's preserved through the wrappers
             **obs
         }
