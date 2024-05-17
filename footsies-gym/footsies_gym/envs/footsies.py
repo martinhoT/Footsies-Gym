@@ -251,6 +251,8 @@ class FootsiesEnv(gym.Env):
                         f"the log file '{self.log_file}' already exists and the environment was set to not overwrite it"
                     )
                 args.extend(["-logFile", self.log_file])
+            else:
+                args.append("-nolog")
 
             self._game_instance = subprocess.Popen(
                 args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
@@ -292,13 +294,14 @@ class FootsiesEnv(gym.Env):
         try:
             res = bytes()
             while len(res) < size:
-                res += sckt.recv(size - len(res))
+                inc = sckt.recv(size - len(res))
+                # The communication is assumed to work correctly, so if a message wasn't received then the game must have closed
+                if len(inc) == 0:
+                    raise FootsiesGameClosedError("game has closed")
+                res += inc
+
         except TimeoutError:
             raise FootsiesGameClosedError("game took too long to respond, will assume it's closed")
-
-        # The communication is assumed to work correctly, so if a message wasn't received then the game must have closed
-        if len(res) == 0:
-            raise FootsiesGameClosedError("game has closed")
 
         return res
 
